@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocViewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --font:'Plus Jakarta Sans',system-ui,sans-serif;
+  --bg:#f5f6fa;--bg2:#ffffff;--bg3:#f8f9fc;--bg4:#eceef4;
+  --text:#111318;--text2:#555b6e;--text3:#8e95a7;
+  --border:#e4e7ef;--border2:#d0d4de;
+  --primary:#5046e5;--ph:#433bcc;--pl:#ededfd;--pg:rgba(80,70,229,.14);
+  --ok:#0d9668;--okl:#e8f8f2;
+  --err:#d62828;--errl:#fceaea;
+  --warn:#cf8a06;--warnl:#fdf6e3;
+  --info:#2563eb;--infol:#ebf2ff;
+  --sw:230px;--hh:54px;
+  --r:8px;--rl:12px;--rxl:16px;
+  --s1:0 1px 2px rgba(0,0,0,.04);--s2:0 4px 14px rgba(0,0,0,.07);--s3:0 14px 40px rgba(0,0,0,.1);
+}
+[data-theme="dark"]{
+  --bg:#0c0e14;--bg2:#161a24;--bg3:#1e222e;--bg4:#282d3a;
+  --text:#e6e8ee;--text2:#9ea3b2;--text3:#656b7e;
+  --border:#242836;--border2:#343848;
+  --primary:#7c78f2;--ph:#6966e0;--pl:rgba(124,120,242,.1);--pg:rgba(124,120,242,.16);
+  --s1:0 1px 2px rgba(0,0,0,.15);--s2:0 4px 14px rgba(0,0,0,.2);--s3:0 14px 40px rgba(0,0,0,.35);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;font-size:13px}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--text3);border-radius:3px}
+.mi{font-family:'Material Icons Outlined';font-size:20px;font-weight:normal;font-style:normal;line-height:1;display:inline-block;vertical-align:middle;-webkit-font-smoothing:antialiased}
+
+/* TOP LOADING BAR */
+#topBar{position:fixed;top:0;left:0;height:3px;background:var(--primary);z-index:9999;transition:width .3s;width:0;border-radius:0 2px 2px 0;pointer-events:none}
+#topBar.active{animation:barPulse 1.5s ease-in-out infinite}
+@keyframes barPulse{0%{opacity:1}50%{opacity:.5}100%{opacity:1}}
+
+/* LOGIN */
+.lp{min-height:100vh;display:flex;justify-content:center;align-items:center;background:var(--bg);padding:20px}
+.lb{width:100%;max-width:370px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:34px 30px;box-shadow:var(--s3)}
+.lb .ll{display:flex;align-items:center;gap:9px;justify-content:center;margin-bottom:26px}
+.lb .lm{width:34px;height:34px;background:var(--primary);border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff}.lb .lm .mi{font-size:18px}
+.lb .ll span{font-size:18px;font-weight:800;color:var(--text)}.lb .ll b{color:var(--primary)}
+.lb h2{font-size:21px;font-weight:800;text-align:center;margin-bottom:3px}
+.lb .ls{text-align:center;font-size:13px;color:var(--text3);margin-bottom:22px}
+.le{color:var(--err);font-size:12px;margin-bottom:10px;display:none;padding:9px 13px;background:var(--errl);border-radius:var(--r);font-weight:500}
+.fg{margin-bottom:15px}
+.fg label{display:block;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+.fw{position:relative}
+.fi{width:100%;padding:9px 13px;border:1.5px solid var(--border2);border-radius:var(--r);font-size:13px;outline:none;background:var(--bg);color:var(--text);font-family:var(--font);transition:border .15s,box-shadow .15s}
+.fi:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--pg)}
+.fi::placeholder{color:var(--text3)}
+.eb{position:absolute;right:9px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text3);display:flex;padding:2px}.eb:hover{color:var(--text)}.eb .mi{font-size:18px}
+.bl{width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);transition:background .15s;margin-top:4px}
+.bl:hover{background:var(--ph)}
+
+/* APP */
+.app{display:none;height:100vh;overflow:hidden;grid-template-columns:var(--sw) 1fr;grid-template-rows:var(--hh) 1fr}
+.hdr{grid-column:1/-1;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 18px;z-index:100}
+.hl{display:flex;align-items:center;gap:14px}
+.hlogo{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;color:var(--text)}
+.hlogo .hm{width:28px;height:28px;background:var(--primary);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff}.hlogo .hm .mi{font-size:15px}
+.hlogo b{color:var(--primary)}
+.srch{position:relative}.srch input{width:220px;padding:7px 11px 7px 32px;border:1.5px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;transition:all .2s}
+.srch input:focus{width:300px;border-color:var(--primary);box-shadow:0 0 0 3px var(--pg)}
+.srch>.mi{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text3)}
+.sd{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);box-shadow:var(--s3);max-height:300px;overflow-y:auto;display:none;z-index:200}.sd.open{display:block}
+.sdi{padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:9px;font-size:12px;border-bottom:1px solid var(--border);transition:background .1s}.sdi:hover{background:var(--bg3)}.sdi:last-child{border:none}
+.hr{display:flex;align-items:center;gap:4px}
+.ib{width:32px;height:32px;border-radius:var(--r);border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;transition:background .1s;color:var(--text2)}.ib:hover{background:var(--bg3)}.ib .mi{font-size:19px}
+.bdg{position:absolute;top:2px;right:1px;background:var(--err);color:#fff;font-size:8px;font-weight:700;padding:0 4px;border-radius:7px;min-width:13px;text-align:center;line-height:13px}
+.dp{position:absolute;top:calc(100% + 6px);right:0;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);box-shadow:var(--s3);display:none;z-index:300;overflow:hidden}.dp.open{display:block}
+.np{width:340px;max-height:380px}.nph{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}.nph h4{font-size:12px;font-weight:700}
+.nl{max-height:320px;overflow-y:auto}.nli{padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}.nli:hover{background:var(--bg3)}.nli.unread{background:var(--pl);border-left:3px solid var(--primary)}.nli .nt2{font-size:12px;font-weight:600;margin-bottom:1px}.nli .nm2{font-size:11px;color:var(--text2)}.nli .nt3{font-size:10px;color:var(--text3);margin-top:2px}
+.avt{width:30px;height:30px;border-radius:50%;border:2px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;font-family:var(--font);transition:border-color .12s}.avt:hover{border-color:var(--primary)}
+.up2{width:190px}.upi{padding:11px 13px;border-bottom:1px solid var(--border)}.upi .un3{font-size:12px;font-weight:700}.upi .ur2{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.upm{padding:8px 13px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .1s;color:var(--text)}.upm:hover{background:var(--bg3)}.upm .mi{font-size:16px;color:var(--text2)}
+
+/* SIDEBAR */
+.side{background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;padding:6px}
+.ns2{font-size:9px;text-transform:uppercase;letter-spacing:1.1px;color:var(--text3);padding:14px 11px 4px;font-weight:700}
+.nv{display:flex;align-items:center;gap:8px;padding:7px 11px;border-radius:7px;cursor:pointer;font-size:12.5px;font-weight:500;color:var(--text2);transition:all .1s;margin-bottom:1px}
+.nv:hover{background:var(--bg3);color:var(--text)}.nv.active{background:var(--primary);color:#fff}.nv.active .mi{color:#fff}
+.nv .mi{font-size:18px;color:var(--text3);transition:color .1s}.nv:hover .mi{color:var(--text)}
+
+/* CONTENT */
+.cnt{overflow-y:auto;padding:22px 26px;background:var(--bg)}
+.pg{display:none;animation:pgIn .2s ease}.pg.active{display:block}
+@keyframes pgIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:8px}
+.pt2{font-size:17px;font-weight:800;display:flex;align-items:center;gap:7px}.pt2 .mi{font-size:21px;color:var(--primary)}
+
+/* CARD */
+.cd{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:18px;margin-bottom:14px;box-shadow:var(--s1)}
+.cdh{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.cdh h3{font-size:13px;font-weight:700}
+
+/* BTN */
+.btn{padding:6px 13px;border:none;border-radius:7px;cursor:pointer;font-size:11.5px;font-weight:600;font-family:var(--font);transition:all .1s;display:inline-flex;align-items:center;gap:4px;line-height:1.4}
+.bp{background:var(--primary);color:#fff}.bp:hover{background:var(--ph)}
+.bd{background:var(--err);color:#fff}.bd:hover{background:#b91c1c}
+.bg{background:transparent;color:var(--text2);border:1px solid var(--border)}.bg:hover{background:var(--bg3)}
+.bs{padding:4px 8px;font-size:10.5px}.bxs{padding:2px 7px;font-size:10px}
+
+/* STATS */
+.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+.sc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;display:flex;align-items:center;gap:12px;transition:transform .1s,box-shadow .1s}.sc:hover{transform:translateY(-1px);box-shadow:var(--s2)}
+.sci{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.sci .mi{font-size:20px}
+.sci.pu{background:var(--pl);color:var(--primary)}.sci.gr{background:var(--okl);color:var(--ok)}.sci.re{background:var(--errl);color:var(--err)}.sci.bl{background:var(--infol);color:var(--info)}.sci.ye{background:var(--warnl);color:var(--warn)}
+.scv{font-size:22px;font-weight:800;line-height:1.2}.scl{font-size:10.5px;color:var(--text3);font-weight:500;margin-top:1px}
+
+/* DATE FILTER */
+.df{display:flex;align-items:center;gap:9px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:14px;flex-wrap:wrap}
+.df label{font-size:12px;font-weight:600;color:var(--text2);display:flex;align-items:center;gap:3px}.df label .mi{font-size:16px}
+.din{padding:6px 9px;border:1.5px solid var(--border2);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--text);font-family:var(--font);outline:none;cursor:pointer}.din:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--pg)}
+.df .dfi{font-size:10.5px;color:var(--text3);margin-left:auto}.df .dfc{font-size:11px;color:var(--primary);cursor:pointer;font-weight:600}
+.dfld{display:none;align-items:center;gap:7px;padding:14px;justify-content:center;color:var(--text3);font-size:12px}.dfld.show{display:flex}
+.spin{width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--primary);border-radius:50%;animation:sp .5s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* TOOLBAR */
+.tb{display:flex;align-items:center;gap:7px;margin-bottom:12px;flex-wrap:wrap}
+.vs{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.vs button{padding:5px 7px;border:none;background:var(--bg3);cursor:pointer;transition:all .1s;color:var(--text2)}.vs button.on{background:var(--primary);color:#fff}.vs button .mi{font-size:15px;display:block}
+.cg{display:flex;gap:3px}
+.chip{padding:3px 10px;border-radius:14px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--text2);transition:all .1s;font-family:var(--font)}.chip.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+select.ts{padding:5px 9px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--bg2);color:var(--text);font-family:var(--font);outline:none;cursor:pointer}
+
+/* BREADCRUMB */
+.bc{display:flex;align-items:center;gap:1px;margin-bottom:10px;flex-wrap:wrap}
+.bci{color:var(--primary);cursor:pointer;font-size:12px;font-weight:500;padding:2px 7px;border-radius:4px;transition:background .1s}.bci:hover{background:var(--pl)}
+.bci.cur{color:var(--text);cursor:default;font-weight:600}.bci.cur:hover{background:transparent}
+.bcs{color:var(--text3);font-size:10px;padding:0 1px}
+
+/* FILES */
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px}
+.fc{background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--rl);padding:18px 14px;text-align:center;cursor:pointer;transition:all .12s;position:relative;overflow:hidden}
+.fc:hover{border-color:var(--primary);box-shadow:0 5px 16px var(--pg);transform:translateY(-2px)}
+.fc .fca{position:absolute;top:5px;right:5px;display:flex;gap:2px;opacity:0;transition:opacity .1s}.fc:hover .fca{opacity:1}
+.fc .fci{margin-bottom:6px;color:var(--primary)}.fc .fci .mi{font-size:32px}.fc .fci.fold{color:var(--warn)}
+.fc .fn2{font-size:11.5px;font-weight:500;color:var(--text);word-break:break-word;line-height:1.35}
+.fc .fs2{font-size:10px;color:var(--text3);margin-top:3px}
+.stb{background:none;border:none;cursor:pointer;color:var(--warn);opacity:.35;transition:opacity .1s;padding:1px;display:flex;align-items:center}.stb:hover,.stb.on{opacity:1}.stb .mi{font-size:16px}
+
+.flist{display:flex;flex-direction:column;gap:2px}
+.fr{display:flex;align-items:center;gap:10px;padding:8px 11px;border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:all .1s;background:var(--bg2)}.fr:hover{border-color:var(--primary);background:var(--pl)}
+.fr .fci .mi{font-size:18px}.fr .f-info{flex:1;min-width:0}.fr .fn2{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fr .fp2{font-size:10px;color:var(--text3)}.fr .fm2{font-size:10.5px;color:var(--text3);white-space:nowrap}
+
+/* SESSIONS */
+.sgr{display:grid;gap:7px}
+.sr{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);transition:all .1s}.sr:hover{border-color:var(--primary)}
+.sr .sav{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;flex-shrink:0}
+.sr .sin{flex:1;min-width:0}.sr .snn{font-size:13px;font-weight:600}.sr .sbr{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px}.sr .sbr .mi{font-size:14px}
+.sr .sti{text-align:right;flex-shrink:0}.sr .sti .sd2{font-size:11.5px;font-weight:500}.sr .sti .sa2{font-size:10px;color:var(--text3)}
+.sts{padding:2px 8px;border-radius:14px;font-size:9.5px;font-weight:700;flex-shrink:0;text-transform:uppercase;letter-spacing:.3px}.sts.on{background:var(--okl);color:var(--ok)}.sts.off{background:var(--bg3);color:var(--text3)}
+
+/* USER DOC TIME TABLE */
+.udt{max-height:400px;overflow-y:auto}
+
+/* PDF */
+.pov{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:1000;display:none;flex-direction:column}.pov.open{display:flex}
+.pbar{background:#14172a;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid #272a40}
+.pbar .ptl{font-size:12px;font-weight:500;color:#dde;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pba{display:flex;gap:4px;align-items:center}
+.pb2{padding:4px 10px;border:1px solid #30335a;border-radius:6px;background:#1c1f38;color:#bbc;font-size:11px;cursor:pointer;font-family:var(--font);transition:all .1s;display:inline-flex;align-items:center;gap:3px}.pb2:hover{background:#26294a;border-color:#44477a}.pb2.am{background:var(--primary);color:#fff;border-color:var(--primary)}.pb2 .mi{font-size:15px}
+.pbar .pif{font-size:10.5px;color:#777a98;min-width:44px;text-align:center}
+.pbody{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;padding:18px;background:#282b3a;gap:12px;user-select:none;-webkit-user-select:none}
+.pbody canvas{box-shadow:0 4px 28px rgba(0,0,0,.5);border-radius:2px}
+.wml{position:fixed;inset:0;pointer-events:none;z-index:1001;overflow:hidden}
+.wm{position:absolute;color:rgba(160,160,190,.09);font-size:20px;font-weight:700;transform:rotate(-30deg);white-space:nowrap;user-select:none}
+
+/* UPLOAD */
+.dz{border:2px dashed var(--border2);border-radius:var(--rl);padding:36px 18px;text-align:center;cursor:pointer;transition:all .15s}.dz:hover,.dz.over{border-color:var(--primary);background:var(--pl)}
+.dz .mi{font-size:36px;color:var(--text3);margin-bottom:4px}.dz p{color:var(--text2);font-size:13px}.dz .dh{font-size:11px;color:var(--text3);margin-top:2px}
+.ui2{padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);margin-bottom:5px;display:flex;justify-content:space-between;align-items:center}
+.ui2 .un4{font-size:11px;font-weight:500}.ui2 .us2{font-size:10.5px;font-weight:500}
+.prb{height:2px;background:var(--bg4);border-radius:2px;margin-top:4px;overflow:hidden}.prf{height:100%;background:var(--primary);border-radius:2px;transition:width .3s}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px 11px;text-align:left;font-size:11.5px;border-bottom:1px solid var(--border)}
+th{font-weight:700;color:var(--text2);font-size:10px;text-transform:uppercase;letter-spacing:.5px;background:var(--bg3);position:sticky;top:0}
+tr:hover td{background:var(--bg3)}
+.rb2{display:inline-block;padding:2px 9px;border-radius:14px;font-size:10px;font-weight:600}
+.ra{background:var(--pl);color:var(--primary)}.ru{background:var(--okl);color:var(--ok)}
+.at2{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}
+.at2-LOGIN{background:#ecfdf5;color:#059669}.at2-LOGOUT{background:#fff7ed;color:#ea580c}.at2-VIEW_FILE{background:#eff6ff;color:#2563eb}.at2-FILE_UPLOADED{background:#faf5ff;color:#7c3aed}.at2-FILE_DELETED{background:#fef2f2;color:#dc2626}.at2-USER_CREATED{background:#ecfdf5;color:#059669}.at2-USER_DELETED{background:#fef2f2;color:#dc2626}.at2-LOGIN_FAILED{background:#fef2f2;color:#dc2626}.at2-PASSWORD_CHANGED{background:#fffbeb;color:#d97706}.at2-FOLDER_CREATED{background:#eef2ff;color:#4f46e5}.at2-LOGS_CLEANUP{background:#fef2f2;color:#dc2626}
+
+/* CHARTS */
+.chg{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.chc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px}.chc h4{font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:10px}
+
+/* MODAL */
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:500;display:none;justify-content:center;align-items:center;backdrop-filter:blur(2px)}.mbg.open{display:flex}
+.mdl{background:var(--bg2);border-radius:var(--rl);padding:22px;width:380px;max-width:92%;box-shadow:var(--s3);animation:mdP .15s ease}
+@keyframes mdP{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+.mdl h3{font-size:15px;font-weight:700;margin-bottom:14px}.mdl .fi,.mdl select{margin-bottom:9px}
+.mf{display:flex;gap:7px;justify-content:flex-end;margin-top:10px}
+
+.empty{text-align:center;padding:40px 14px;color:var(--text3)}.empty .mi{font-size:36px;margin-bottom:6px;opacity:.4;display:block}.empty p{font-size:12px}
+.ckl{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--text1);cursor:pointer;user-select:none}.ckl input{display:none}.ckb{width:18px;height:18px;border:2px solid var(--border2);border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}.ckl input:checked+.ckb{background:var(--primary);border-color:var(--primary)}.ckl input:checked+.ckb::after{content:'';display:block;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);margin-top:-1px}
+.toasts{position:fixed;top:14px;right:14px;z-index:2000;display:flex;flex-direction:column;gap:5px}
+.toast{padding:9px 14px;border-radius:var(--r);font-size:12px;font-weight:500;color:#fff;animation:tI .3s ease;box-shadow:var(--s3);max-width:320px;font-family:var(--font)}.ts2{background:#059669}.te{background:#dc2626}.ti2{background:#2563eb}
+@keyframes tI{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.pag{display:flex;gap:3px;justify-content:center;margin-top:12px}.pag .btn.cur{background:var(--primary);color:#fff}
+@keyframes shim{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@media print{body *{display:none!important}body::after{content:"Printing disabled.";display:block;text-align:center;padding:100px;font-size:24px;color:#999}}
+@media(max-width:768px){.app{grid-template-columns:1fr}.side{display:none}.srch input{width:110px}.srch input:focus{width:170px}.fgrid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}.chg{grid-template-columns:1fr}.cnt{padding:12px}}
+</style>
+</head>
+<body>
+<div id="topBar"></div>
+<div class="toasts" id="toasts"></div>
+
+<div class="lp" id="loginPage">
+  <div class="lb">
+    <div class="ll"><div class="lm"><span class="mi">description</span></div><span>Doc<b>Viewer</b></span></div>
+    <h2>Sign In</h2>
+    <p class="ls">Enter your credentials to continue</p>
+    <div class="le" id="loginError"></div>
+    <div class="fg"><label>Username</label><div class="fw"><input class="fi" type="text" id="loginUser" placeholder="Username" autocomplete="username"></div></div>
+    <div class="fg"><label>Password</label><div class="fw"><input class="fi" type="password" id="loginPass" placeholder="Password" autocomplete="current-password" style="padding-right:36px"><button type="button" class="eb" onclick="toggleEye()"><span class="mi" id="eyeIco">visibility_off</span></button></div></div>
+    <button class="bl" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <div class="hdr">
+    <div class="hl"><div class="hlogo"><div class="hm"><span class="mi">description</span></div>Doc<b>Viewer</b></div>
+      <div class="srch"><span class="mi">search</span><input id="searchInput" placeholder="Search files..." oninput="doSearch()" onfocus="doSearch()"><div class="sd" id="searchDrop"></div></div>
+    </div>
+    <div class="hr">
+      <button class="ib" onclick="toggleTheme()" id="themeBtn"><span class="mi">dark_mode</span></button>
+      <div style="position:relative"><button class="ib" onclick="toggleNotif()"><span class="mi">notifications</span><span class="bdg" id="nBadge" style="display:none">0</span></button><div class="dp np" id="notifPanel"><div class="nph"><h4>Notifications</h4><button class="btn bxs bg" onclick="readAllNotifs()">Mark all read</button></div><div class="nl" id="notifList"></div></div></div>
+      <div style="position:relative"><div class="avt" id="avatarBtn" onclick="toggleUserMenu()"></div><div class="dp up2" id="userPanel"><div class="upi"><div class="un3" id="upName"></div><div class="ur2" id="upRole"></div></div><div class="upm" onclick="showMyPwModal()"><span class="mi">lock</span>Change Password</div><div class="upm" onclick="doLogout()" style="color:var(--err)"><span class="mi" style="color:var(--err)">logout</span>Logout</div></div></div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="nv active" data-p="dashboard" onclick="go('dashboard')"><span class="mi">dashboard</span>Dashboard</div>
+    <div class="nv" data-p="documents" onclick="go('documents')"><span class="mi">folder</span>Documents</div>
+    <div class="nv" data-p="favorites" onclick="go('favorites')"><span class="mi">star</span>Favorites</div>
+    <div class="nv" data-p="recent" onclick="go('recent')"><span class="mi">schedule</span>Recent</div>
+    <div class="ns2 admin-only">Admin</div>
+    <div class="nv admin-only" data-p="upload" onclick="go('upload')"><span class="mi">upload_file</span>Upload</div>
+    <div class="nv admin-only" data-p="users" onclick="go('users')"><span class="mi">group</span>Users</div>
+    <div class="nv admin-only" data-p="sessions" onclick="go('sessions')"><span class="mi">devices</span>Sessions</div>
+    <div class="nv admin-only" data-p="doctime" onclick="go('doctime')"><span class="mi">timer</span>User Doc Time</div>
+    <div class="nv admin-only" data-p="audit" onclick="go('audit')"><span class="mi">shield</span>Audit Trail</div>
+    <div class="nv admin-only" data-p="analytics" onclick="go('analytics')"><span class="mi">bar_chart</span>Analytics</div>
+    <div class="nv admin-only" data-p="settings" onclick="go('settings')"><span class="mi">settings</span>Settings</div>
+  </div>
+  <div class="cnt">
+    <div class="pg active" id="pg-dashboard"><div class="ph"><div class="pt2"><span class="mi">dashboard</span>Dashboard</div></div><div class="sg" id="dashStats"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div class="cd"><div class="cdh"><h3>Recent Files</h3></div><div id="dashRecent" class="flist"></div></div><div class="cd"><div class="cdh"><h3>Favorites</h3></div><div id="dashFavs" class="flist"></div></div></div></div>
+    <div class="pg" id="pg-documents"><div class="ph"><div class="pt2"><span class="mi">folder</span>Documents</div></div>
+      <div class="df"><label><span class="mi">calendar_today</span>Filter by date</label><input type="date" class="din" id="dateFilter" onchange="applyDateFilter()"><span class="dfc" id="dateClear" onclick="clearDateFilter()" style="display:none">Clear</span><span class="dfi" id="dateInfo"></span></div>
+      <div class="dfld" id="dateLoading"><div class="spin"></div>Loading files for selected date...</div>
+      <div class="cd"><div class="bc" id="bc"></div><div class="tb"><div class="vs"><button class="on" id="vGrid" onclick="setView('grid')"><span class="mi">grid_view</span></button><button id="vList" onclick="setView('list')"><span class="mi">view_list</span></button></div><select class="ts" id="sortSel" onchange="loadFiles()"><option value="name">Name A-Z</option><option value="name-d">Name Z-A</option><option value="size">Size small</option><option value="size-d">Size large</option></select><div class="cg"><span class="chip on" data-f="all" onclick="setFilter(this)">All</span><span class="chip" data-f="pdf" onclick="setFilter(this)">PDF</span><span class="chip" data-f="image" onclick="setFilter(this)">Images</span><span class="chip" data-f="folder" onclick="setFilter(this)">Folders</span></div></div><div id="fileArea"></div><div id="fileSkel" style="display:none"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px"><div class="skel" style="height:110px;border-radius:var(--rl);background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shim 1.5s infinite"></div><div class="skel" style="height:110px;border-radius:var(--rl);background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shim 1.5s infinite"></div><div class="skel" style="height:110px;border-radius:var(--rl);background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shim 1.5s infinite"></div><div class="skel" style="height:110px;border-radius:var(--rl);background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shim 1.5s infinite"></div></div></div><div id="fileEmpty" class="empty" style="display:none"><span class="mi">folder_off</span><p>No files found</p></div></div></div>
+    <div class="pg" id="pg-favorites"><div class="ph"><div class="pt2"><span class="mi">star</span>Favorites</div></div><div class="cd"><div id="favArea" class="flist"></div><div id="favEmpty" class="empty" style="display:none"><span class="mi">star_border</span><p>No favorites yet</p></div></div></div>
+    <div class="pg" id="pg-recent"><div class="ph"><div class="pt2"><span class="mi">schedule</span>Recent</div></div><div class="cd"><div id="recentArea" class="flist"></div><div id="recentEmpty" class="empty" style="display:none"><span class="mi">history</span><p>No recent files</p></div></div></div>
+    <div class="pg" id="pg-upload"><div class="ph"><div class="pt2"><span class="mi">upload_file</span>Upload Files</div></div><div class="cd"><div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><select class="fi" id="upFolder" style="width:auto;min-width:170px;margin:0"><option value="">/ (root)</option></select><input class="fi" id="upSub" placeholder="Or type path..." style="flex:1;min-width:170px;margin:0"><button class="btn bg" onclick="showModal('folderModal')"><span class="mi" style="font-size:15px">create_new_folder</span> New Folder</button></div><div class="dz" id="dropZone" onclick="document.getElementById('fInput').click()"><span class="mi">cloud_upload</span><p><strong>Click or drag files here</strong></p><p class="dh">PDF, images, and other documents</p></div><input type="file" id="fInput" multiple style="display:none" onchange="pickFiles(event)"><div id="upQueue" style="margin-top:8px"></div></div></div>
+    <div class="pg" id="pg-users"><div class="ph"><div class="pt2"><span class="mi">group</span>Users</div><button class="btn bp" onclick="showModal('userModal')"><span class="mi" style="font-size:15px">person_add</span> Add User</button></div><div class="cd"><table><thead><tr><th>User</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead><tbody id="usersTb"></tbody></table></div></div>
+    <div class="pg" id="pg-sessions"><div class="ph"><div class="pt2"><span class="mi">devices</span>Login Sessions</div><button class="btn bg bs" onclick="exportCSV('logins')"><span class="mi" style="font-size:14px">download</span> Export</button></div><div class="cd"><div class="sgr" id="sessionGrid"></div></div></div>
+    <div class="pg" id="pg-doctime"><div class="ph"><div class="pt2"><span class="mi">timer</span>User Document Time</div></div><div class="cd"><div class="udt"><table><thead><tr><th>User</th><th>Document</th><th>Views</th><th>Total Time</th><th>Last Viewed</th></tr></thead><tbody id="doctimeTb"></tbody></table></div></div></div>
+    <div class="pg" id="pg-audit"><div class="ph"><div class="pt2"><span class="mi">shield</span>Audit Trail</div><button class="btn bg bs" onclick="exportCSV('audit')"><span class="mi" style="font-size:14px">download</span> Export</button></div><div class="cd"><div style="max-height:450px;overflow-y:auto"><table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr></thead><tbody id="auditTb"></tbody></table></div><div class="pag" id="auditPag"></div></div></div>
+    <div class="pg" id="pg-analytics"><div class="ph"><div class="pt2"><span class="mi">bar_chart</span>Analytics</div><div style="display:flex;gap:5px;align-items:center"><select class="ts" id="aDays" onchange="loadAnalytics()"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select><button class="btn bg bs" onclick="exportCSV('logins')">Logins CSV</button><button class="btn bg bs" onclick="exportCSV('views')">Views CSV</button></div></div><div class="sg" id="aStats"></div><div class="chg"><div class="chc"><h4>Logins Per Day</h4><canvas id="c1"></canvas></div><div class="chc"><h4>Logins By User</h4><canvas id="c2"></canvas></div><div class="chc"><h4>Time Spent (min)</h4><canvas id="c3"></canvas></div><div class="chc"><h4>Views Per Day</h4><canvas id="c4"></canvas></div><div class="chc"><h4>Views By User</h4><canvas id="c5"></canvas></div><div class="chc"><h4>Top Documents</h4><canvas id="c6"></canvas></div></div></div>
+    <div class="pg" id="pg-settings"><div class="ph"><div class="pt2"><span class="mi">settings</span>Settings</div></div>
+<div class="cd"><div class="cdh"><h3><span class="mi" style="font-size:18px;vertical-align:middle;margin-right:6px">delete_sweep</span>Database Maintenance</h3></div>
+<p style="font-size:12px;color:var(--text2);margin-bottom:16px">Select which data to delete and the time period. This action cannot be undone.</p>
+<div style="display:flex;flex-direction:column;gap:14px">
+<div><label style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;display:block">Delete data older than</label>
+<select class="fi" id="cleanupPeriod" style="width:220px;margin:0">
+<option value="1">1 Month</option>
+<option value="2">2 Months</option>
+<option value="3" selected>3 Months</option>
+<option value="6">6 Months</option>
+<option value="12">1 Year</option>
+</select></div>
+<div><label style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;display:block">Select data to delete</label>
+<div style="display:flex;flex-direction:column;gap:8px">
+<label class="ckl"><input type="checkbox" id="ckLogin" checked><span class="ckb"></span><span class="mi" style="font-size:16px;color:var(--pri)">login</span> Login Logs</label>
+<label class="ckl"><input type="checkbox" id="ckViews" checked><span class="ckb"></span><span class="mi" style="font-size:16px;color:var(--pri)">visibility</span> View Logs</label>
+<label class="ckl"><input type="checkbox" id="ckAudit"><span class="ckb"></span><span class="mi" style="font-size:16px;color:var(--pri)">gavel</span> Audit Trail</label>
+<label class="ckl"><input type="checkbox" id="ckNotif" checked><span class="ckb"></span><span class="mi" style="font-size:16px;color:var(--pri)">notifications</span> Notifications</label>
+</div></div>
+<div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+<button class="btn bd" id="cleanupBtn" onclick="cleanupLogs()"><span class="mi" style="font-size:15px">delete_sweep</span> Delete Selected Data</button>
+<label class="ckl" style="font-size:11px;color:var(--text3)"><input type="checkbox" id="ckConfirm"><span class="ckb"></span> I understand this cannot be undone</label>
+</div>
+<div id="cleanupResult" style="margin-top:6px;font-size:12px;color:var(--ok);display:none"></div>
+</div></div></div>
+  </div>
+</div>
+
+<div class="pov" id="pdfOvl">
+  <div class="pbar"><div class="ptl" id="pdfTitle"></div><div class="pba">
+    <button class="pb2 am" id="mPage" onclick="setPdfMode('page')"><span class="mi">article</span>Page</button><button class="pb2" id="mScroll" onclick="setPdfMode('scroll')"><span class="mi">view_day</span>Scroll</button>
+    <button class="pb2" onclick="pPrev()"><span class="mi">chevron_left</span></button><span class="pif" id="pInfo">1/1</span><button class="pb2" onclick="pNext()"><span class="mi">chevron_right</span></button>
+    <button class="pb2" onclick="pOut()"><span class="mi">remove</span></button><span class="pif" id="pZoom">120%</span><button class="pb2" onclick="pIn()"><span class="mi">add</span></button>
+    <button class="pb2" onclick="pFit()"><span class="mi">fit_screen</span></button><button class="pb2" id="pStar" onclick="togglePdfStar()"><span class="mi">star_border</span></button>
+    <button class="pb2 admin-only" id="pDL" onclick="pDownload()"><span class="mi">download</span></button><button class="pb2" onclick="closePdf()" style="color:#f87171"><span class="mi">close</span></button>
+  </div></div>
+  <div class="pbody" id="pdfBody" oncontextmenu="return false"></div>
+  <div class="wml" id="wmLayer"></div>
+</div>
+
+<div class="mbg" id="userModal"><div class="mdl"><h3>Add User</h3><input class="fi" id="nuName" placeholder="Username"><input class="fi" type="password" id="nuPass" placeholder="Password"><select class="fi" id="nuRole"><option value="user">User</option><option value="admin">Admin</option></select><div class="mf"><button class="btn bg" onclick="closeModal('userModal')">Cancel</button><button class="btn bp" onclick="addUser()">Add</button></div></div></div>
+<div class="mbg" id="folderModal"><div class="mdl"><h3>New Folder</h3><input class="fi" id="nfName" placeholder="e.g. Reports/31 March 2026"><div class="mf"><button class="btn bg" onclick="closeModal('folderModal')">Cancel</button><button class="btn bp" onclick="mkFolder()">Create</button></div></div></div>
+<div class="mbg" id="pwModal"><div class="mdl"><h3>Change Password</h3><input type="hidden" id="cpId"><p style="font-size:11px;color:var(--text2);margin-bottom:9px" id="cpFor"></p><input class="fi" type="password" id="cpPw" placeholder="New password"><div class="mf"><button class="btn bg" onclick="closeModal('pwModal')">Cancel</button><button class="btn bp" onclick="changePw()">Change</button></div></div></div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+let U=null,curPath=[],vMode='grid',fFilter='all',favs=new Set(),dateFilterFiles=null;
+let pDoc=null,pPg=1,pSc=1.2,pFile='',pName='',pStart=null,pMode='page',pViewLogId=null;
+let charts={},aPage=1,sTmr=null;
+
+// TOP BAR
+function barStart(){const b=document.getElementById('topBar');b.style.width='30%';b.classList.add('active');setTimeout(()=>b.style.width='70%',200)}
+function barEnd(){const b=document.getElementById('topBar');b.style.width='100%';b.classList.remove('active');setTimeout(()=>{b.style.transition='none';b.style.width='0';setTimeout(()=>b.style.transition='width .3s',50)},300)}
+
+async function api(u,o={}){barStart();try{const r=await fetch(u,{headers:{'Content-Type':'application/json',...o.headers},...o});if(r.status===440||(r.status===401&&!u.includes('/me'))){doLogout();throw new Error('Session expired')}const d=await r.json();if(!r.ok)throw new Error(d.error||'Failed');return d}finally{barEnd()}}
+async function apiRaw(u,o={}){return fetch(u,{headers:{'Content-Type':'application/json',...o.headers},...o})}
+function toast(m,t='info'){const e=document.createElement('div');e.className='toast '+(t==='success'?'ts2':t==='error'?'te':'ti2');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(()=>{e.style.transition='all .3s';e.style.opacity='0';setTimeout(()=>e.remove(),300)},3500)}
+function fmtSize(b){if(!b)return'';if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB'}
+function fmtDate(d){if(!d)return'-';return new Date(d).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}
+function fmtAgo(d){if(!d)return'';const m=Math.floor((Date.now()-new Date(d))/60000);if(m<1)return'Just now';if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago'}
+function fmtDur(s){if(!s||s<1)return'0s';if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m '+s%60+'s';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m'}
+function showModal(id){document.getElementById(id).classList.add('open')}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+function esc(s){return(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
+document.querySelectorAll('.mbg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')}));
+function toggleEye(){const p=document.getElementById('loginPass'),i=document.getElementById('eyeIco');if(p.type==='password'){p.type='text';i.textContent='visibility'}else{p.type='password';i.textContent='visibility_off'}}
+function toggleTheme(){const d=document.documentElement.dataset.theme==='dark';document.documentElement.dataset.theme=d?'light':'dark';localStorage.setItem('dv-theme',d?'light':'dark');updTI()}
+function updTI(){document.getElementById('themeBtn').innerHTML=document.documentElement.dataset.theme==='dark'?'<span class="mi">light_mode</span>':'<span class="mi">dark_mode</span>'}
+(function(){const t=localStorage.getItem('dv-theme');if(t)document.documentElement.dataset.theme=t;updTI()})();
+function getBrowser(){const u=navigator.userAgent;if(u.includes('Edg/'))return'Microsoft Edge';if(u.includes('Chrome/')&&!u.includes('Edg/'))return'Google Chrome';if(u.includes('Firefox/'))return'Mozilla Firefox';if(u.includes('Safari/')&&!u.includes('Chrome/'))return'Safari';return'Web Browser'}
+
+async function doLogin(){const u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value,err=document.getElementById('loginError');err.style.display='none';if(!u||!p){err.textContent='Enter username and password';err.style.display='block';return}try{U=await api('/api/login',{method:'POST',body:JSON.stringify({username:u,password:p,browserInfo:getBrowser()})});boot()}catch(e){err.textContent=e.message;err.style.display='block'}}
+async function doLogout(){try{await api('/api/logout',{method:'POST'})}catch(e){}U=null;document.getElementById('app').style.display='none';document.getElementById('loginPage').style.display='flex';document.getElementById('loginPass').value=''}
+async function checkAuth(){try{U=await api('/api/me');boot()}catch(e){document.getElementById('loginPage').style.display='flex'}}
+function boot(){document.getElementById('loginPage').style.display='none';document.getElementById('app').style.display='grid';document.querySelectorAll('.admin-only').forEach(e=>e.style.display=U.role==='admin'?'':'none');const av=document.getElementById('avatarBtn');av.style.background=U.avatarColor||'#5046e5';av.textContent=U.username[0].toUpperCase();document.getElementById('upName').textContent=U.username;document.getElementById('upRole').textContent=U.role;loadFavs();go('dashboard');loadNCount();setInterval(loadNCount,60000);const t=new Date(),y=t.getFullYear(),m=String(t.getMonth()+1).padStart(2,'0'),d=String(t.getDate()).padStart(2,'0');document.getElementById('dateFilter').value=`${y}-${m}-${d}`}
+document.getElementById('loginPass').addEventListener('keypress',e=>{if(e.key==='Enter')doLogin()});
+document.getElementById('loginUser').addEventListener('keypress',e=>{if(e.key==='Enter')doLogin()});
+
+function go(p){document.querySelectorAll('.pg').forEach(e=>e.classList.remove('active'));document.querySelectorAll('.nv').forEach(e=>e.classList.remove('active'));const pg=document.getElementById('pg-'+p);if(pg)pg.classList.add('active');const ni=document.querySelector(`.nv[data-p="${p}"]`);if(ni)ni.classList.add('active');
+if(p==='dashboard')loadDash();else if(p==='documents'){curPath=[];dateFilterFiles=null;applyDateFilter()}else if(p==='favorites')loadFavsPage();else if(p==='recent')loadRecent();else if(p==='upload')loadUpFolders();else if(p==='users')loadUsers();else if(p==='sessions')loadSessions();else if(p==='doctime')loadDocTime();else if(p==='audit'){aPage=1;loadAudit()}else if(p==='analytics')loadAnalytics()}
+
+async function loadDash(){try{const s=await api('/api/dashboard-stats'),isA=U.role==='admin';
+document.getElementById('dashStats').innerHTML=`<div class="sc"><div class="sci pu"><span class="mi">visibility</span></div><div><div class="scv">${s.totalViews}</div><div class="scl">${isA?'Total':'My'} Views</div></div></div><div class="sc"><div class="sci ye"><span class="mi">star</span></div><div><div class="scv">${s.totalFavorites}</div><div class="scl">Favorites</div></div></div><div class="sc"><div class="sci bl"><span class="mi">timer</span></div><div><div class="scv">${s.totalTimeMinutes}m</div><div class="scl">Time Spent</div></div></div>${isA?`<div class="sc"><div class="sci gr"><span class="mi">group</span></div><div><div class="scv">${s.totalUsers}</div><div class="scl">Total Users</div></div></div><div class="sc"><div class="sci re"><span class="mi">login</span></div><div><div class="scv">${s.todayLogins}</div><div class="scl">Today's Logins</div></div></div>`:''}`;
+const[rec,fv]=await Promise.all([api('/api/recent'),api('/api/favorites')]);
+document.getElementById('dashRecent').innerHTML=rec.slice(0,5).map(f=>`<div class="fr" onclick="openPdf('${esc(f.file_path)}','${esc(f.file_name)}')"><div class="fci"><span class="mi">description</span></div><div class="f-info"><div class="fn2">${f.file_name}</div><div class="fp2">${fmtAgo(f.view_start)}</div></div></div>`).join('')||'<div class="empty"><p>No recent files</p></div>';
+document.getElementById('dashFavs').innerHTML=fv.slice(0,5).map(f=>`<div class="fr" onclick="openPdf('${esc(f.file_path)}','${esc(f.file_name)}')"><div class="fci"><span class="mi">description</span></div><div class="f-info"><div class="fn2">${f.file_name}</div></div></div>`).join('')||'<div class="empty"><p>No favorites</p></div>'}catch(e){toast(e.message,'error')}}
+
+async function loadFavs(){try{const f=await api('/api/favorites');favs=new Set(f.map(x=>x.file_path))}catch(e){}}
+async function toggleFav(fp,fn,ev){if(ev)ev.stopPropagation();try{if(favs.has(fp)){await api(`/api/favorites/${fp}`,{method:'DELETE'});favs.delete(fp)}else{await api('/api/favorites',{method:'POST',body:JSON.stringify({filePath:fp,fileName:fn})});favs.add(fp)}loadFiles()}catch(e){toast(e.message,'error')}}
+async function loadFavsPage(){try{const f=await api('/api/favorites');document.getElementById('favEmpty').style.display=f.length?'none':'';document.getElementById('favArea').innerHTML=f.map(x=>`<div class="fr" onclick="openPdf('${esc(x.file_path)}','${esc(x.file_name)}')"><div class="fci"><span class="mi">description</span></div><div class="f-info"><div class="fn2">${x.file_name}</div><div class="fp2">${x.file_path}</div></div><div class="fm2">${fmtAgo(x.added_at)}</div><button class="btn bd bxs" onclick="event.stopPropagation();rmFav('${esc(x.file_path)}')">Remove</button></div>`).join('')}catch(e){}}
+async function rmFav(fp){await api(`/api/favorites/${fp}`,{method:'DELETE'}).catch(()=>{});favs.delete(fp);loadFavsPage()}
+async function loadRecent(){try{const r=await api('/api/recent');document.getElementById('recentEmpty').style.display=r.length?'none':'';document.getElementById('recentArea').innerHTML=r.map(x=>`<div class="fr" onclick="openPdf('${esc(x.file_path)}','${esc(x.file_name)}')"><div class="fci"><span class="mi">description</span></div><div class="f-info"><div class="fn2">${x.file_name}</div><div class="fp2">${x.file_path}</div></div><div class="fm2">${fmtDur(x.view_duration_seconds)} viewed</div><div class="fm2">${fmtAgo(x.view_start)}</div></div>`).join('')}catch(e){}}
+
+function doSearch(){clearTimeout(sTmr);const q=document.getElementById('searchInput').value.trim(),dd=document.getElementById('searchDrop');if(q.length<2){dd.classList.remove('open');return}
+sTmr=setTimeout(async()=>{try{const r=await api(`/api/search?q=${encodeURIComponent(q)}`);if(!r.length){dd.innerHTML='<div style="padding:12px;text-align:center;color:var(--text3);font-size:11px">No results</div>';dd.classList.add('open');return}dd.innerHTML=r.map(x=>`<div class="sdi" onclick="document.getElementById('searchDrop').classList.remove('open');document.getElementById('searchInput').value='';openPdf('${esc(x.path)}','${esc(x.name)}')"><span class="mi" style="color:var(--primary);font-size:17px">description</span><div><div style="font-weight:500;font-size:11.5px">${x.name}</div><div style="font-size:10px;color:var(--text3)">${x.path}</div></div></div>`).join('');dd.classList.add('open')}catch(e){}},300)}
+document.addEventListener('click',e=>{if(!e.target.closest('.srch'))document.getElementById('searchDrop').classList.remove('open')});
+
+async function applyDateFilter(){const v=document.getElementById('dateFilter').value,info=document.getElementById('dateInfo'),clr=document.getElementById('dateClear'),ld=document.getElementById('dateLoading');if(v){clr.style.display='inline';const dt=new Date(v+'T00:00:00');info.textContent='Showing files uploaded on '+dt.toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'});ld.classList.add('show');try{dateFilterFiles=await api(`/api/files-by-date?date=${v}`)}catch(e){dateFilterFiles=[];toast('Could not fetch','error')}ld.classList.remove('show')}else{clr.style.display='none';info.textContent='';dateFilterFiles=null}loadFiles()}
+function clearDateFilter(){document.getElementById('dateFilter').value='';dateFilterFiles=null;document.getElementById('dateClear').style.display='none';document.getElementById('dateInfo').textContent='';loadFiles()}
+
+function renderBC(){const bc=document.getElementById('bc');bc.innerHTML='';const r=document.createElement('span');r.className='bci'+(curPath.length?'':' cur');r.textContent='All Documents';r.onclick=()=>{curPath=[];loadFiles()};bc.appendChild(r);curPath.forEach((f,i)=>{const s=document.createElement('span');s.className='bcs';s.textContent='/';bc.appendChild(s);const it=document.createElement('span');it.className='bci'+(i===curPath.length-1?' cur':'');it.textContent=f;it.onclick=()=>{curPath=curPath.slice(0,i+1);loadFiles()};bc.appendChild(it)})}
+function setView(m){vMode=m;document.getElementById('vGrid').classList.toggle('on',m==='grid');document.getElementById('vList').classList.toggle('on',m==='list');loadFiles()}
+function setFilter(el){fFilter=el.dataset.f;document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.f===fFilter));loadFiles()}
+
+async function loadFiles(){renderBC();const area=document.getElementById('fileArea'),skel=document.getElementById('fileSkel'),empty=document.getElementById('fileEmpty');area.innerHTML='';skel.style.display='block';empty.style.display='none';
+try{let items;if(dateFilterFiles!==null&&curPath.length===0){items=dateFilterFiles;skel.style.display='none'}else{const p=curPath.join('/'),url=p?`/api/browse/${p}`:'/api/folders';items=await api(url);skel.style.display='none'}
+items=items.filter(i=>i.name!=='.gitkeep');
+if(fFilter==='pdf')items=items.filter(i=>i.type==='dir'||/\.pdf$/i.test(i.name));else if(fFilter==='image')items=items.filter(i=>i.type==='dir'||/\.(jpg|jpeg|png|gif|svg|webp)$/i.test(i.name));else if(fFilter==='folder')items=items.filter(i=>i.type==='dir');
+const sort=document.getElementById('sortSel').value;items.sort((a,b)=>{if(a.type==='dir'&&b.type!=='dir')return-1;if(a.type!=='dir'&&b.type==='dir')return 1;if(sort==='name')return a.name.localeCompare(b.name);if(sort==='name-d')return b.name.localeCompare(a.name);if(sort==='size')return(a.size||0)-(b.size||0);return(b.size||0)-(a.size||0)});
+if(!items.length){empty.style.display='';return}
+if(vMode==='grid'){const g=document.createElement('div');g.className='fgrid';items.forEach(i=>{const d=i.type==='dir',pdf=/\.pdf$/i.test(i.name);const c=document.createElement('div');c.className='fc';c.innerHTML=`${!d?`<div class="fca"><button class="stb ${favs.has(i.path)?'on':''}" onclick="toggleFav('${esc(i.path)}','${esc(i.name)}',event)"><span class="mi">${favs.has(i.path)?'star':'star_border'}</span></button>${U.role==='admin'?`<button class="stb" style="color:var(--err)" onclick="event.stopPropagation();delFile('${esc(i.path)}')"><span class="mi">delete</span></button>`:''}</div>`:''}<div class="fci ${d?'fold':''}"><span class="mi">${d?'folder':'description'}</span></div><div class="fn2">${i.name}</div>${!d?`<div class="fs2">${fmtSize(i.size)}</div>`:''}`;c.onclick=()=>{if(d){curPath.push(i.name);loadFiles()}else if(pdf)openPdf(i.path,i.name)};g.appendChild(c)});area.appendChild(g)}
+else{const l=document.createElement('div');l.className='flist';items.forEach(i=>{const d=i.type==='dir',pdf=/\.pdf$/i.test(i.name);const r=document.createElement('div');r.className='fr';r.innerHTML=`<div class="fci ${d?'fold':''}"><span class="mi">${d?'folder':'description'}</span></div><div class="f-info"><div class="fn2">${i.name}</div><div class="fp2">${i.path}</div></div>${!d?`<div class="fm2">${fmtSize(i.size)}</div><button class="stb ${favs.has(i.path)?'on':''}" onclick="toggleFav('${esc(i.path)}','${esc(i.name)}',event)"><span class="mi">${favs.has(i.path)?'star':'star_border'}</span></button>${U.role==='admin'?`<button class="btn bd bxs" onclick="event.stopPropagation();delFile('${esc(i.path)}')">Delete</button>`:''}`:''}`;r.onclick=()=>{if(d){curPath.push(i.name);loadFiles()}else if(pdf)openPdf(i.path,i.name)};l.appendChild(r)});area.appendChild(l)}
+}catch(e){skel.style.display='none';empty.style.display='';empty.querySelector('p').textContent='Error: '+e.message}}
+async function delFile(fp){if(!confirm('Delete '+fp+'?'))return;try{await api(`/api/files/${fp}`,{method:'DELETE'});toast('Deleted','success');loadFiles()}catch(e){toast(e.message,'error')}}
+
+// PDF - accurate time tracking
+async function openPdf(fp,fn){if(!/\.pdf$/i.test(fn))return;document.getElementById('pdfOvl').classList.add('open');document.getElementById('pdfTitle').textContent=fn;pFile=fp;pName=fn;pStart=Date.now();pPg=1;pSc=1.2;pMode='page';pViewLogId=null;
+document.getElementById('mPage').classList.add('am');document.getElementById('mScroll').classList.remove('am');document.getElementById('pStar').innerHTML=favs.has(fp)?'<span class="mi">star</span>':'<span class="mi">star_border</span>';mkWM();
+try{const resp=await apiRaw(`/api/pdf/${fp}`);if(!resp.ok)throw new Error('Failed to load');pViewLogId=resp.headers.get('X-View-Log-Id');const buf=await resp.arrayBuffer();pDoc=await pdfjsLib.getDocument({data:buf}).promise;document.getElementById('pInfo').textContent=`1/${pDoc.numPages}`;renderPdf()}catch(e){toast(e.message,'error');closePdf()}}
+function mkWM(){const l=document.getElementById('wmLayer');l.innerHTML='';if(U.role==='admin')return;for(let i=0;i<15;i++){const w=document.createElement('div');w.className='wm';w.textContent=U.username+' - CONFIDENTIAL';w.style.top=(i*100+20)+'px';w.style.left=((i%3)*300-100)+'px';l.appendChild(w)}}
+async function renderPdf(){if(!pDoc)return;const body=document.getElementById('pdfBody');body.querySelectorAll('canvas').forEach(c=>c.remove());
+if(pMode==='scroll'){for(let i=1;i<=pDoc.numPages;i++){const pg=await pDoc.getPage(i),vp=pg.getViewport({scale:pSc}),c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;body.appendChild(c);await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise}document.getElementById('pInfo').textContent=`All ${pDoc.numPages}`}
+else{const pg=await pDoc.getPage(pPg),vp=pg.getViewport({scale:pSc}),c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;body.appendChild(c);await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;document.getElementById('pInfo').textContent=`${pPg}/${pDoc.numPages}`}
+document.getElementById('pZoom').textContent=Math.round(pSc*100)+'%'}
+function setPdfMode(m){pMode=m;document.getElementById('mPage').classList.toggle('am',m==='page');document.getElementById('mScroll').classList.toggle('am',m==='scroll');renderPdf()}
+function pPrev(){if(pMode==='page'&&pPg>1){pPg--;renderPdf()}}
+function pNext(){if(pMode==='page'&&pDoc&&pPg<pDoc.numPages){pPg++;renderPdf()}}
+function pIn(){pSc=Math.min(pSc+.2,4);renderPdf()}
+function pOut(){pSc=Math.max(pSc-.2,.3);renderPdf()}
+function pFit(){const w=document.getElementById('pdfBody').clientWidth-50;if(pDoc)pDoc.getPage(pPg||1).then(p=>{pSc=w/p.getViewport({scale:1}).width;renderPdf()})}
+function pDownload(){if(U.role==='admin')window.open(`/api/pdf/${pFile}`,'_blank')}
+function togglePdfStar(){toggleFav(pFile,pName);document.getElementById('pStar').innerHTML=favs.has(pFile)?'<span class="mi">star_border</span>':'<span class="mi">star</span>'}
+function closePdf(){document.getElementById('pdfOvl').classList.remove('open');document.getElementById('wmLayer').innerHTML='';if(pStart&&pFile){const secs=Math.round((Date.now()-pStart)/1000);api('/api/view-log',{method:'POST',body:JSON.stringify({viewLogId:pViewLogId,filePath:pFile,durationSeconds:secs})}).catch(()=>{})}pDoc=null;pFile='';pStart=null;pViewLogId=null}
+document.addEventListener('keydown',e=>{if(!document.getElementById('pdfOvl').classList.contains('open'))return;if(e.key==='Escape')closePdf();if(e.key==='ArrowLeft')pPrev();if(e.key==='ArrowRight')pNext();if(e.ctrlKey&&e.key==='p'){e.preventDefault();toast('Printing disabled','error')}});
+
+async function loadUpFolders(){try{const f=await api('/api/folders');const s=document.getElementById('upFolder');s.innerHTML='<option value="">/ (root)</option>';f.filter(x=>x.type==='dir').forEach(x=>{s.appendChild(Object.assign(document.createElement('option'),{value:x.name,textContent:x.name}))})}catch(e){}}
+const dz=document.getElementById('dropZone');dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over')});dz.addEventListener('dragleave',()=>dz.classList.remove('over'));dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');uploadFiles(e.dataTransfer.files)});
+function pickFiles(ev){uploadFiles(ev.target.files);ev.target.value=''}
+async function uploadFiles(files){const q=document.getElementById('upQueue'),fp=document.getElementById('upSub').value.trim()||document.getElementById('upFolder').value;
+for(const f of files){const el=document.createElement('div');el.className='ui2';el.innerHTML=`<div><div class="un4">${f.name}</div><div class="prb"><div class="prf" style="width:10%"></div></div></div><div class="us2" style="color:var(--text3)">Uploading...</div>`;q.appendChild(el);
+try{el.querySelector('.prf').style.width='40%';const b64=await toB64(f);el.querySelector('.prf').style.width='70%';await api('/api/upload',{method:'POST',body:JSON.stringify({folderPath:fp,fileName:f.name,fileContent:b64})});el.querySelector('.prf').style.width='100%';el.querySelector('.us2').textContent='Done';el.querySelector('.us2').style.color='var(--ok)'}
+catch(e){el.querySelector('.us2').textContent='Failed';el.querySelector('.us2').style.color='var(--err)';el.querySelector('.prf').style.background='var(--err)'}}toast('Upload complete','success');loadUpFolders()}
+function toB64(f){return new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result.split(',')[1]);rd.onerror=j;rd.readAsDataURL(f)})}
+function mkFolder(){const n=document.getElementById('nfName').value.trim();if(!n)return toast('Enter name','error');api('/api/create-folder',{method:'POST',body:JSON.stringify({folderPath:n})}).then(()=>{toast('Created','success');closeModal('folderModal');loadUpFolders()}).catch(e=>toast(e.message,'error'))}
+
+async function loadUsers(){try{const u=await api('/api/users');document.getElementById('usersTb').innerHTML=u.map(x=>`<tr><td><div style="display:flex;align-items:center;gap:7px"><div class="avt" style="background:${x.avatar_color||'#5046e5'};width:26px;height:26px;font-size:10px;border:none">${x.username[0].toUpperCase()}</div><strong style="font-size:12px">${x.username}</strong></div></td><td><span class="rb2 ${x.role==='admin'?'ra':'ru'}">${x.role}</span></td><td style="color:var(--text3);font-size:11px">${fmtDate(x.created_at)}</td><td><button class="btn bg bxs" onclick="showPwModal(${x.id},'${x.username}')">Password</button> ${x.role!=='admin'?`<button class="btn bd bxs" onclick="delUser(${x.id})">Delete</button>`:''}</td></tr>`).join('')}catch(e){toast(e.message,'error')}}
+function addUser(){const u=document.getElementById('nuName').value.trim(),p=document.getElementById('nuPass').value,r=document.getElementById('nuRole').value;if(!u||!p)return toast('Fill fields','error');api('/api/users',{method:'POST',body:JSON.stringify({username:u,password:p,role:r})}).then(()=>{toast('Added','success');closeModal('userModal');loadUsers()}).catch(e=>toast(e.message,'error'))}
+function delUser(id){if(!confirm('Delete?'))return;api(`/api/users/${id}`,{method:'DELETE'}).then(()=>{toast('Deleted','success');loadUsers()}).catch(e=>toast(e.message,'error'))}
+function showPwModal(id,n){document.getElementById('cpId').value=id;document.getElementById('cpFor').textContent='For: '+n;document.getElementById('cpPw').value='';showModal('pwModal')}
+function showMyPwModal(){document.getElementById('cpId').value='';document.getElementById('cpFor').textContent='For: '+U.username;document.getElementById('cpPw').value='';showModal('pwModal')}
+function changePw(){const id=document.getElementById('cpId').value,pw=document.getElementById('cpPw').value;if(!pw||pw.length<4)return toast('Min 4 chars','error');api('/api/users/change-password',{method:'POST',body:JSON.stringify({userId:id||undefined,newPassword:pw})}).then(()=>{toast('Changed','success');closeModal('pwModal')}).catch(e=>toast(e.message,'error'))}
+
+async function loadSessions(){try{const sessions=await api('/api/active-sessions');const colors=['#5046e5','#8b5cf6','#ec4899','#f43f5e','#f97316','#22c55e','#06b6d4','#3b82f6'];
+document.getElementById('sessionGrid').innerHTML=sessions.map(s=>{const on=!s.logout_time;const cl=colors[s.username.charCodeAt(0)%colors.length];const ip=s.ip_address||'';const fip=(!ip||ip==='::1'||ip==='127.0.0.1'||ip.includes('::ffff:127'))?'Localhost':ip.replace('::ffff:','');
+return`<div class="sr"><div class="sav" style="background:${cl}">${s.username[0].toUpperCase()}</div><div class="sin"><div class="snn">${s.username}</div><div class="sbr"><span class="mi">computer</span>${s.browser_info} &middot; ${fip}</div></div><div class="sti"><div class="sd2">${fmtDate(s.login_time)}</div><div class="sa2">${fmtAgo(s.login_time)}</div></div><div class="sts ${on?'on':'off'}">${on?'Active':'Ended'}</div></div>`}).join('')||'<div class="empty"><p>No sessions</p></div>'}catch(e){toast(e.message,'error')}}
+
+async function loadDocTime(){try{const rows=await api('/api/user-doc-time');document.getElementById('doctimeTb').innerHTML=rows.map(r=>`<tr><td><strong style="font-size:11.5px">${r.username}</strong></td><td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${r.file_name||r.file_path}</td><td style="font-size:11px">${r.view_count}</td><td style="font-size:11px;font-weight:600">${fmtDur(+r.total_seconds)}</td><td style="font-size:10.5px;color:var(--text3)">${fmtDate(r.last_viewed)}</td></tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--text3)">No data</td></tr>'}catch(e){toast(e.message,'error')}}
+
+async function cleanupLogs(){
+  if(!document.getElementById('ckConfirm').checked){toast('Please confirm by checking "I understand this cannot be undone"','error');return}
+  const types=[];
+  if(document.getElementById('ckLogin').checked)types.push('login_logs');
+  if(document.getElementById('ckViews').checked)types.push('view_logs');
+  if(document.getElementById('ckAudit').checked)types.push('audit_log');
+  if(document.getElementById('ckNotif').checked)types.push('notifications');
+  if(!types.length){toast('Select at least one data type to delete','error');return}
+  const months=document.getElementById('cleanupPeriod').value;
+  const names=types.map(t=>({login_logs:'Login Logs',view_logs:'View Logs',audit_log:'Audit Trail',notifications:'Notifications'}[t])).join(', ');
+  if(!confirm(`Delete ${names} older than ${months} month(s)? This cannot be undone.`))return;
+  const btn=document.getElementById('cleanupBtn');btn.disabled=true;btn.innerHTML='<span class="mi" style="font-size:15px">hourglass_empty</span> Deleting...';
+  try{const r=await api('/api/admin/cleanup-logs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({types,months:parseInt(months)})});
+  const el=document.getElementById('cleanupResult');el.style.display='block';
+  const parts=Object.entries(r.deleted).filter(([k])=>k!=='total').map(([k,v])=>`${k}: ${v}`).join(', ');
+  el.textContent=`Deleted ${r.deleted.total} records (${parts})`;toast('Cleanup complete','success');document.getElementById('ckConfirm').checked=false}catch(e){toast(e.message,'error')}
+  btn.disabled=false;btn.innerHTML='<span class="mi" style="font-size:15px">delete_sweep</span> Delete Selected Data'}
+
+async function loadNCount(){try{const{count}=await api('/api/notifications/unread-count');const b=document.getElementById('nBadge');b.textContent=count;b.style.display=count>0?'':'none'}catch(e){}}
+function toggleNotif(){const p=document.getElementById('notifPanel');p.classList.toggle('open');if(p.classList.contains('open'))loadNotifs()}
+async function loadNotifs(){try{const n=await api('/api/notifications');document.getElementById('notifList').innerHTML=n.length?n.map(x=>`<div class="nli ${x.is_read?'':'unread'}" onclick="readNotif(${x.id},this)"><div class="nt2">${x.title}</div>${x.message?`<div class="nm2">${x.message}</div>`:''}<div class="nt3">${fmtAgo(x.created_at)}</div></div>`).join(''):'<div style="padding:18px;text-align:center;color:var(--text3);font-size:11px">No notifications</div>'}catch(e){}}
+async function readNotif(id,el){await api(`/api/notifications/read/${id}`,{method:'POST'}).catch(()=>{});el.classList.remove('unread');loadNCount()}
+async function readAllNotifs(){await api('/api/notifications/read-all',{method:'POST'}).catch(()=>{});loadNotifs();loadNCount()}
+function toggleUserMenu(){document.getElementById('userPanel').classList.toggle('open')}
+document.addEventListener('click',e=>{if(!e.target.closest('.ib')&&!e.target.closest('.np'))document.getElementById('notifPanel').classList.remove('open');if(!e.target.closest('.avt')&&!e.target.closest('.up2'))document.getElementById('userPanel').classList.remove('open')});
+
+async function loadAudit(){try{const d=await api(`/api/audit-log?page=${aPage}&limit=50`);document.getElementById('auditTb').innerHTML=d.logs.map(l=>`<tr><td style="white-space:nowrap;color:var(--text3);font-size:10.5px">${fmtDate(l.created_at)}</td><td><strong style="font-size:11.5px">${l.username}</strong></td><td><span class="at2 at2-${l.action}">${l.action.replace(/_/g,' ')}</span></td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;color:var(--text2);font-size:10.5px">${l.details||'-'}</td><td style="font-size:10.5px;color:var(--text3)">${l.ip_address||'-'}</td></tr>`).join('');
+const tp=Math.ceil(d.total/50),pg=document.getElementById('auditPag');pg.innerHTML='';for(let i=1;i<=Math.min(tp,10);i++){const b=document.createElement('button');b.className='btn bg bs'+(i===aPage?' cur':'');b.textContent=i;b.onclick=()=>{aPage=i;loadAudit()};pg.appendChild(b)}}catch(e){toast(e.message,'error')}}
+function exportCSV(t){window.open(`/api/analytics/export?type=${t}&days=${document.getElementById('aDays')?.value||30}`)}
+
+const COLS=['#5046e5','#8b5cf6','#ec4899','#f43f5e','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#14b8a6'];
+function killCharts(){Object.values(charts).forEach(c=>c.destroy());charts={}}
+async function loadAnalytics(){const days=document.getElementById('aDays').value;killCharts();const dk=document.documentElement.dataset.theme==='dark';const gc=dk?'rgba(255,255,255,.04)':'rgba(0,0,0,.03)';Chart.defaults.color=dk?'#9ea3b2':'#555b6e';Chart.defaults.borderColor=gc;
+try{const[ld,vd]=await Promise.all([api(`/api/analytics/logins?days=${days}`),api(`/api/analytics/views?days=${days}`)]);
+const tL=ld.loginsPerUser.reduce((s,u)=>s+ +u.count,0),tV=vd.viewsPerUser.reduce((s,u)=>s+ +u.view_count,0),uU=ld.loginsPerUser.length,tM=ld.timeSpentPerUser.reduce((s,u)=>s+u.totalMinutes,0);
+document.getElementById('aStats').innerHTML=`<div class="sc"><div class="sci pu"><span class="mi">login</span></div><div><div class="scv">${tL}</div><div class="scl">Logins</div></div></div><div class="sc"><div class="sci gr"><span class="mi">group</span></div><div><div class="scv">${uU}</div><div class="scl">Active Users</div></div></div><div class="sc"><div class="sci bl"><span class="mi">visibility</span></div><div><div class="scv">${tV}</div><div class="scl">Views</div></div></div><div class="sc"><div class="sci ye"><span class="mi">timer</span></div><div><div class="scv">${tM}m</div><div class="scl">Total Time</div></div></div>`;
+const bo={responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:gc}},x:{grid:{color:gc}}}};
+const fmtD=d=>{const dt=d.date?new Date(d.date):null;return dt?dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):''};
+charts.c1=new Chart(document.getElementById('c1'),{type:'bar',data:{labels:ld.loginsPerDay.map(fmtD),datasets:[{data:ld.loginsPerDay.map(d=>+d.count),backgroundColor:'#5046e5',borderRadius:4}]},options:bo});
+charts.c2=new Chart(document.getElementById('c2'),{type:'doughnut',data:{labels:ld.loginsPerUser.map(u=>u.username),datasets:[{data:ld.loginsPerUser.map(u=>+u.count),backgroundColor:COLS}]},options:{responsive:true,cutout:'55%'}});
+charts.c3=new Chart(document.getElementById('c3'),{type:'bar',data:{labels:ld.timeSpentPerUser.map(u=>u.username),datasets:[{data:ld.timeSpentPerUser.map(u=>u.totalMinutes),backgroundColor:'#8b5cf6',borderRadius:4}]},options:bo});
+charts.c4=new Chart(document.getElementById('c4'),{type:'line',data:{labels:vd.viewsPerDay.map(fmtD),datasets:[{data:vd.viewsPerDay.map(d=>+d.count),borderColor:'#059669',backgroundColor:'rgba(5,150,105,.08)',fill:true,tension:.4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:gc}},x:{grid:{color:gc}}}}});
+charts.c5=new Chart(document.getElementById('c5'),{type:'doughnut',data:{labels:vd.viewsPerUser.map(u=>u.username),datasets:[{data:vd.viewsPerUser.map(u=>+u.view_count),backgroundColor:COLS}]},options:{responsive:true,cutout:'55%'}});
+charts.c6=new Chart(document.getElementById('c6'),{type:'bar',data:{labels:vd.topFiles.map(f=>(f.file_name||f.file_path.split('/').pop()).substring(0,18)),datasets:[{data:vd.topFiles.map(f=>+f.view_count),backgroundColor:'#dc2626',borderRadius:4}]},options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,grid:{color:gc}},y:{grid:{color:gc}}}}});
+}catch(e){toast(e.message,'error')}}
+
+checkAuth();
+</script>
+</body>
+</html>

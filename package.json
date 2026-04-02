@@ -1,0 +1,16 @@
+{
+  "name": "docviewer",
+  "version": "1.0.0",
+  "description": "Document Portal - View & manage PDF files from GitHub",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.12.0",
+    "bcryptjs": "^2.4.3",
+    "express-session": "^1.17.3",
+    "dotenv": "^16.3.1"
+  }
+}
