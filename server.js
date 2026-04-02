@@ -6,6 +6,7 @@ const { Pool } = require('pg');
 const path = require('path');
 
 const app = express();
+app.set('trust proxy', true);
 const PORT = process.env.PORT || 4000;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPO = process.env.GITHUB_REPO;
@@ -58,7 +59,7 @@ app.use((req, res, next) => {
 const auth = (r, s, n) => r.session.user ? n() : s.status(401).json({ error: 'Unauthorized' });
 const adminOnly = (r, s, n) => r.session.user?.role === 'admin' ? n() : s.status(403).json({ error: 'Forbidden' });
 const getIP = r => {
-  let ip = r.headers['x-forwarded-for']?.split(',')[0]?.trim() || r.socket.remoteAddress || '';
+  let ip = r.headers['x-forwarded-for']?.split(',')[0]?.trim() || r.headers['x-real-ip'] || r.headers['cf-connecting-ip'] || r.ip || r.socket.remoteAddress || '';
   ip = ip.replace('::ffff:', '');
   if (ip === '::1' || ip === '127.0.0.1') ip = 'Localhost';
   return ip;
