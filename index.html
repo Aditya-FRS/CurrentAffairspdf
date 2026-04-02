@@ -274,11 +274,12 @@ tr:hover td{background:var(--bg3)}
 <div style="display:flex;flex-direction:column;gap:14px">
 <div><label style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;display:block">Delete data older than</label>
 <select class="fi" id="cleanupPeriod" style="width:220px;margin:0">
-<option value="1">1 Month</option>
-<option value="2">2 Months</option>
-<option value="3" selected>3 Months</option>
-<option value="6">6 Months</option>
-<option value="12">1 Year</option>
+<option value="0">All Data</option>
+<option value="1">Older than 1 Month</option>
+<option value="2">Older than 2 Months</option>
+<option value="3" selected>Older than 3 Months</option>
+<option value="6">Older than 6 Months</option>
+<option value="12">Older than 1 Year</option>
 </select></div>
 <div><label style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;display:block">Select data to delete</label>
 <div style="display:flex;flex-direction:column;gap:8px">

@@ -342,20 +342,21 @@ app.post('/api/admin/cleanup-logs', adminOnly, async (req, res) => {
     const allowed = ['login_logs', 'view_logs', 'audit_log', 'notifications'];
     const selected = types.filter(t => allowed.includes(t));
     if (!selected.length) return res.status(400).json({ error: 'No valid data types selected' });
-    const m = Math.max(1, Math.min(12, parseInt(months) || 3));
-    const interval = `${m} months`;
+    const m = Math.max(0, Math.min(12, parseInt(months)));
     const deleted = {};
     let total = 0;
-    const timeCol = { login_logs: 'login_time', view_logs: 'view_start', audit_log: 'ts', notifications: 'created_at' };
+    const timeCol = { login_logs: 'login_time', view_logs: 'view_start', audit_log: 'created_at', notifications: 'created_at' };
     const labels = { login_logs: 'loginLogs', view_logs: 'viewLogs', audit_log: 'auditLogs', notifications: 'notifications' };
     for (const t of selected) {
-      const r = await pool.query(`DELETE FROM ${t} WHERE ${timeCol[t]} < NOW() - INTERVAL '${interval}' RETURNING id`);
+      const r = m === 0
+        ? await pool.query(`DELETE FROM ${t} RETURNING id`)
+        : await pool.query(`DELETE FROM ${t} WHERE ${timeCol[t]} < NOW() - INTERVAL '${m} months' RETURNING id`);
       deleted[labels[t]] = r.rowCount;
       total += r.rowCount;
     }
     deleted.total = total;
     const parts = selected.map(t => `${labels[t]}:${deleted[labels[t]]}`).join(', ');
-    logAudit(req.session.user.username, 'LOGS_CLEANUP', `Deleted ${total} old records older than ${m}mo (${parts})`, getIP(req));
+    logAudit(req.session.user.username, 'LOGS_CLEANUP', `Deleted ${total} records ${m===0?'(all data)':'older than '+m+'mo'} (${parts})`, getIP(req));
     res.json({ ok: true, deleted });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
