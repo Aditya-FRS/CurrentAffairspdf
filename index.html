@@ -172,9 +172,9 @@ select.ts{padding:5px 9px;border:1px solid var(--border);border-radius:6px;font-
 .pbody{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;padding:18px;background:#282b3a;gap:12px}
 .pbody canvas{box-shadow:0 4px 28px rgba(0,0,0,.5);border-radius:2px}
 .pgw{position:relative;display:inline-block}
-.pgw .textLayer{position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;opacity:.25;line-height:1}
-.pgw .textLayer span{color:transparent;position:absolute;white-space:pre;cursor:text}
-.pgw .textLayer ::selection{background:rgba(0,100,200,.4)}
+.pgw .textLayer{position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;opacity:.3;line-height:1}
+.pgw .textLayer span{color:transparent;position:absolute;white-space:pre;cursor:text;font-weight:700}
+.pgw .textLayer span::selection{background:rgba(0,100,200,.5);color:rgba(0,0,0,.01)}
 .wml{position:fixed;inset:0;pointer-events:none;z-index:1001;overflow:hidden}
 .wm{position:absolute;color:rgba(160,160,190,.09);font-size:20px;font-weight:700;transform:rotate(-30deg);white-space:nowrap;user-select:none}
 
@@ -304,7 +304,7 @@ tr:hover td{background:var(--bg3)}
 <div class="pov" id="pdfOvl">
   <div class="pbar"><div class="ptl" id="pdfTitle"></div><div class="pba">
     <button class="pb2 am" id="mPage" onclick="setPdfMode('page')"><span class="mi">article</span>Page</button><button class="pb2" id="mScroll" onclick="setPdfMode('scroll')"><span class="mi">view_day</span>Scroll</button>
-    <button class="pb2" onclick="pPrev()"><span class="mi">chevron_left</span></button><span class="pif" id="pInfo">1/1</span><button class="pb2" onclick="pNext()"><span class="mi">chevron_right</span></button>
+    <button class="pb2" onclick="pPrev()"><span class="mi">chevron_left</span></button><span class="pif"><input type="text" id="pPageIn" value="1" onkeydown="if(event.key==='Enter')goToPage()" style="width:28px;text-align:center;background:transparent;border:1px solid #44477a;border-radius:4px;color:#bbc;font-size:11px;font-family:var(--font);padding:1px 2px">/<span id="pTotal">1</span></span><button class="pb2" onclick="pNext()"><span class="mi">chevron_right</span></button>
     <button class="pb2" onclick="pOut()"><span class="mi">remove</span></button><span class="pif" id="pZoom">120%</span><button class="pb2" onclick="pIn()"><span class="mi">add</span></button>
     <button class="pb2" onclick="pFit()"><span class="mi">fit_screen</span></button><button class="pb2" id="pStar" onclick="togglePdfStar()"><span class="mi">star_border</span></button>
     <button class="pb2 admin-only" id="pDL" onclick="pDownload()"><span class="mi">download</span></button><button class="pb2" onclick="closePdf()" style="color:#f87171"><span class="mi">close</span></button>
@@ -391,19 +391,25 @@ async function delFile(fp){if(!confirm('Delete '+fp+'?'))return;try{await api(`/
 // PDF - accurate time tracking
 async function openPdf(fp,fn){if(!/\.pdf$/i.test(fn))return;document.getElementById('pdfOvl').classList.add('open');document.getElementById('pdfTitle').textContent=fn;pFile=fp;pName=fn;pStart=Date.now();pPg=1;pSc=1.2;pMode='page';pViewLogId=null;
 document.getElementById('mPage').classList.add('am');document.getElementById('mScroll').classList.remove('am');document.getElementById('pStar').innerHTML=favs.has(fp)?'<span class="mi">star</span>':'<span class="mi">star_border</span>';mkWM();
-try{const resp=await apiRaw(`/api/pdf/${fp}`);if(!resp.ok)throw new Error('Failed to load');pViewLogId=resp.headers.get('X-View-Log-Id');const buf=await resp.arrayBuffer();pDoc=await pdfjsLib.getDocument({data:buf}).promise;document.getElementById('pInfo').textContent=`1/${pDoc.numPages}`;renderPdf()}catch(e){toast(e.message,'error');closePdf()}}
+try{const resp=await apiRaw(`/api/pdf/${fp}`);if(!resp.ok)throw new Error('Failed to load');pViewLogId=resp.headers.get('X-View-Log-Id');const buf=await resp.arrayBuffer();pDoc=await pdfjsLib.getDocument({data:buf}).promise;updatePageInfo();renderPdf()}catch(e){toast(e.message,'error');closePdf()}}
 function mkWM(){const l=document.getElementById('wmLayer');l.innerHTML='';if(U.role==='admin')return;for(let i=0;i<15;i++){const w=document.createElement('div');w.className='wm';w.textContent=U.username+' - CONFIDENTIAL';w.style.top=(i*100+20)+'px';w.style.left=((i%3)*300-100)+'px';l.appendChild(w)}}
+function getScrollPage(){const body=document.getElementById('pdfBody'),wraps=body.querySelectorAll('.pgw');if(!wraps.length)return 1;const mid=body.scrollTop+body.clientHeight/2;let cum=0;for(let i=0;i<wraps.length;i++){cum+=wraps[i].offsetHeight+12;if(cum>mid)return i+1}return wraps.length}
+function getScrollInfo(){const body=document.getElementById('pdfBody'),wraps=body.querySelectorAll('.pgw');if(!wraps.length)return{page:1,offsetInPage:0,pageHeight:1};const st=body.scrollTop;let cum=0;for(let i=0;i<wraps.length;i++){const h=wraps[i].offsetHeight+12;if(cum+h>st)return{page:i+1,offsetInPage:(st-cum)/h,pageHeight:h};cum+=h}return{page:wraps.length,offsetInPage:0,pageHeight:1}}
+function updatePageInfo(){const inp=document.getElementById('pPageIn'),tot=document.getElementById('pTotal');if(!pDoc)return;tot.textContent=pDoc.numPages;if(pMode==='scroll'){inp.value=getScrollPage()}else{inp.value=pPg}}
 async function renderPdf(){if(!pDoc)return Promise.resolve();const body=document.getElementById('pdfBody');body.querySelectorAll('.pgw').forEach(c=>c.remove());body.querySelectorAll('canvas').forEach(c=>c.remove());
-async function renderPage(i){const pg=await pDoc.getPage(i),vp=pg.getViewport({scale:pSc}),wrap=document.createElement('div');wrap.className='pgw';wrap.style.width=vp.width+'px';wrap.style.height=vp.height+'px';const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;wrap.appendChild(c);await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;const txt=await pg.getTextContent();const tDiv=document.createElement('div');tDiv.className='textLayer';tDiv.style.width=vp.width+'px';tDiv.style.height=vp.height+'px';pdfjsLib.renderTextLayer({textContent:txt,container:tDiv,viewport:vp,textDivs:[]});wrap.appendChild(tDiv);body.appendChild(wrap)}
-if(pMode==='scroll'){for(let i=1;i<=pDoc.numPages;i++)await renderPage(i);document.getElementById('pInfo').textContent=`All ${pDoc.numPages}`}
-else{await renderPage(pPg);document.getElementById('pInfo').textContent=`${pPg}/${pDoc.numPages}`}
-document.getElementById('pZoom').textContent=Math.round(pSc*100)+'%'}
-function setPdfMode(m){pMode=m;document.getElementById('mPage').classList.toggle('am',m==='page');document.getElementById('mScroll').classList.toggle('am',m==='scroll');renderPdf()}
-function pPrev(){if(pMode==='page'&&pPg>1){pPg--;renderPdf()}}
-function pNext(){if(pMode==='page'&&pDoc&&pPg<pDoc.numPages){pPg++;renderPdf()}}
-function pIn(){const body=document.getElementById('pdfBody'),pct=body.scrollHeight?body.scrollTop/body.scrollHeight:0;pSc=Math.min(pSc+.2,4);renderPdf().then(()=>{if(pMode==='scroll')body.scrollTop=pct*body.scrollHeight})}
-function pOut(){const body=document.getElementById('pdfBody'),pct=body.scrollHeight?body.scrollTop/body.scrollHeight:0;pSc=Math.max(pSc-.2,.3);renderPdf().then(()=>{if(pMode==='scroll')body.scrollTop=pct*body.scrollHeight})}
-function pFit(){const body=document.getElementById('pdfBody'),w=body.clientWidth-50,pct=body.scrollHeight?body.scrollTop/body.scrollHeight:0;if(pDoc)pDoc.getPage(pPg||1).then(p=>{pSc=w/p.getViewport({scale:1}).width;renderPdf().then(()=>{if(pMode==='scroll')body.scrollTop=pct*body.scrollHeight})})}
+async function renderPage(i){const pg=await pDoc.getPage(i),vp=pg.getViewport({scale:pSc}),wrap=document.createElement('div');wrap.className='pgw';wrap.dataset.page=i;wrap.style.width=vp.width+'px';wrap.style.height=vp.height+'px';const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;wrap.appendChild(c);await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;const txt=await pg.getTextContent();const tDiv=document.createElement('div');tDiv.className='textLayer';tDiv.style.width=vp.width+'px';tDiv.style.height=vp.height+'px';pdfjsLib.renderTextLayer({textContent:txt,container:tDiv,viewport:vp,textDivs:[]});wrap.appendChild(tDiv);body.appendChild(wrap)}
+if(pMode==='scroll'){for(let i=1;i<=pDoc.numPages;i++)await renderPage(i)}
+else{await renderPage(pPg)}
+updatePageInfo();document.getElementById('pZoom').textContent=Math.round(pSc*100)+'%'}
+function setPdfMode(m){pMode=m;document.getElementById('mPage').classList.toggle('am',m==='page');document.getElementById('mScroll').classList.toggle('am',m==='scroll');if(m==='scroll'){renderPdf()}else{pPg=getScrollPage();renderPdf()}}
+function pPrev(){if(pPg>1){pPg--;if(pMode==='scroll')scrollToPage(pPg);else renderPdf()}}
+function pNext(){if(pDoc&&pPg<pDoc.numPages){pPg++;if(pMode==='scroll')scrollToPage(pPg);else renderPdf()}}
+function scrollToPage(n){const body=document.getElementById('pdfBody'),wraps=body.querySelectorAll('.pgw');if(wraps[n-1])wraps[n-1].scrollIntoView({behavior:'smooth',block:'start'});updatePageInfo()}
+function goToPage(){const inp=document.getElementById('pPageIn'),n=parseInt(inp.value);if(!pDoc||isNaN(n)||n<1||n>pDoc.numPages){inp.value=pMode==='scroll'?getScrollPage():pPg;return}pPg=n;if(pMode==='scroll')scrollToPage(n);else renderPdf()}
+function pIn(){let si;if(pMode==='scroll')si=getScrollInfo();pSc=Math.min(pSc+.2,4);renderPdf().then(()=>{if(pMode==='scroll'&&si){const body=document.getElementById('pdfBody'),wraps=body.querySelectorAll('.pgw');let cum=0;for(let i=0;i<si.page-1;i++)cum+=wraps[i].offsetHeight+12;body.scrollTop=cum+si.offsetInPage*(wraps[si.page-1].offsetHeight+12)}})}
+function pOut(){let si;if(pMode==='scroll')si=getScrollInfo();pSc=Math.max(pSc-.2,.3);renderPdf().then(()=>{if(pMode==='scroll'&&si){const body=document.getElementById('pdfBody'),wraps=body.querySelectorAll('.pgw');let cum=0;for(let i=0;i<si.page-1;i++)cum+=wraps[i].offsetHeight+12;body.scrollTop=cum+si.offsetInPage*(wraps[si.page-1].offsetHeight+12)}})}
+function pFit(){let si;if(pMode==='scroll')si=getScrollInfo();const body=document.getElementById('pdfBody'),w=body.clientWidth-50;if(pDoc)pDoc.getPage(pPg||1).then(p=>{pSc=w/p.getViewport({scale:1}).width;renderPdf().then(()=>{if(pMode==='scroll'&&si){const wraps=body.querySelectorAll('.pgw');let cum=0;for(let i=0;i<si.page-1;i++)cum+=wraps[i].offsetHeight+12;body.scrollTop=cum+si.offsetInPage*(wraps[si.page-1].offsetHeight+12)}})})}
+document.getElementById('pdfBody').addEventListener('scroll',function(){if(pMode==='scroll'&&pDoc)updatePageInfo()});
 function pDownload(){if(U.role==='admin')window.open(`/api/pdf/${pFile}`,'_blank')}
 function togglePdfStar(){toggleFav(pFile,pName);document.getElementById('pStar').innerHTML=favs.has(pFile)?'<span class="mi">star_border</span>':'<span class="mi">star</span>'}
 function closePdf(){document.getElementById('pdfOvl').classList.remove('open');document.getElementById('wmLayer').innerHTML='';if(pStart&&pFile){const secs=Math.round((Date.now()-pStart)/1000);api('/api/view-log',{method:'POST',body:JSON.stringify({viewLogId:pViewLogId,filePath:pFile,durationSeconds:secs})}).catch(()=>{})}pDoc=null;pFile='';pStart=null;pViewLogId=null}
