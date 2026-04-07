@@ -65,8 +65,7 @@ const getIP = r => {
   if (ip === '::1' || ip === '127.0.0.1') ip = 'Localhost';
   return ip;
 };
-const getDevice = r => parseBrowser(r.headers['user-agent'] || '');
-const logAudit = (u, a, d, device) => pool.query('INSERT INTO audit_log (username, action, details, ip_address) VALUES ($1,$2,$3,$4)', [u, a, d, device || '']).catch(() => {});
+const logAudit = (u, a, d, ip) => pool.query('INSERT INTO audit_log (username, action, details, ip_address) VALUES ($1,$2,$3,$4)', [u, a, d, ip || '']).catch(() => {});
 
 function parseBrowser(ua) {
   if (!ua) return 'Web Browser';
@@ -111,22 +110,22 @@ app.post('/api/login', async (req, res) => {
     const r = await pool.query('SELECT * FROM doc_users WHERE username = $1', [username]);
     const user = r.rows[0];
     if (!user || !bcrypt.compareSync(password, user.password)) {
-      logAudit(username || 'unknown', 'LOGIN_FAILED', 'Invalid credentials', getDevice(req));
+      logAudit(username || 'unknown', 'LOGIN_FAILED', 'Invalid credentials', getIP(req));
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     const browser = browserInfo || parseBrowser(req.headers['user-agent'] || '');
     req.session.user = { id: user.id, username: user.username, role: user.role, avatarColor: user.avatar_color };
     req.session.lastActivity = Date.now();
-    const log = await pool.query('INSERT INTO login_logs (username, ip_address, browser_info) VALUES ($1, $2, $3) RETURNING id', [user.username, getDevice(req), browser]);
+    const log = await pool.query('INSERT INTO login_logs (username, ip_address, browser_info) VALUES ($1, $2, $3) RETURNING id', [user.username, getIP(req), browser]);
     req.session.loginLogId = log.rows[0].id;
-    logAudit(user.username, 'LOGIN', `Via ${browser}`, getDevice(req));
+    logAudit(user.username, 'LOGIN', `Via ${browser}`, getIP(req));
     res.json({ username: user.username, role: user.role, avatarColor: user.avatar_color });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/logout', async (req, res) => {
   if (!req.session.user) return res.json({ ok: true });
-  logAudit(req.session.user.username, 'LOGOUT', 'Logged out', getDevice(req));
+  logAudit(req.session.user.username, 'LOGOUT', 'Logged out', getIP(req));
   if (req.session.loginLogId) await pool.query('UPDATE login_logs SET logout_time = NOW() WHERE id = $1', [req.session.loginLogId]).catch(() => {});
   req.session.destroy();
   res.json({ ok: true });
@@ -159,14 +158,14 @@ app.post('/api/users', adminOnly, async (req, res) => {
     const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
     await pool.query('INSERT INTO doc_users (username, password, role, avatar_color) VALUES ($1,$2,$3,$4)',
       [username, bcrypt.hashSync(password, 10), role || 'user', colors[Math.floor(Math.random() * colors.length)]]);
-    logAudit(req.session.user.username, 'USER_CREATED', `Created: ${username}`, getDevice(req));
+    logAudit(req.session.user.username, 'USER_CREATED', `Created: ${username}`, getIP(req));
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.delete('/api/users/:id', adminOnly, async (req, res) => {
   const r = await pool.query('SELECT username FROM doc_users WHERE id = $1', [req.params.id]);
   await pool.query('DELETE FROM doc_users WHERE id = $1 AND role != $2', [req.params.id, 'admin']);
-  if (r.rows[0]) logAudit(req.session.user.username, 'USER_DELETED', `Deleted: ${r.rows[0].username}`, getDevice(req));
+  if (r.rows[0]) logAudit(req.session.user.username, 'USER_DELETED', `Deleted: ${r.rows[0].username}`, getIP(req));
   res.json({ ok: true });
 });
 app.post('/api/users/change-password', auth, async (req, res) => {
@@ -174,7 +173,7 @@ app.post('/api/users/change-password', auth, async (req, res) => {
   if (!newPassword || newPassword.length < 4) return res.status(400).json({ error: 'Min 4 chars' });
   const targetId = req.session.user.role === 'admin' && userId ? userId : req.session.user.id;
   await pool.query('UPDATE doc_users SET password = $1 WHERE id = $2', [bcrypt.hashSync(newPassword, 10), targetId]);
-  logAudit(req.session.user.username, 'PASSWORD_CHANGED', `User ID: ${targetId}`, getDevice(req));
+  logAudit(req.session.user.username, 'PASSWORD_CHANGED', `User ID: ${targetId}`, getIP(req));
   res.json({ ok: true });
 });
 
@@ -249,7 +248,7 @@ app.get('/api/pdf/*', auth, async (req, res) => {
     const buffer = await response.arrayBuffer();
     const fileName = filePath.split('/').pop();
     const vlog = await pool.query('INSERT INTO view_logs (username, file_path, file_name) VALUES ($1,$2,$3) RETURNING id', [req.session.user.username, filePath, fileName]);
-    logAudit(req.session.user.username, 'VIEW_FILE', `Viewed: ${filePath}`, getDevice(req));
+    logAudit(req.session.user.username, 'VIEW_FILE', `Viewed: ${filePath}`, getIP(req));
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline');
     res.setHeader('X-View-Log-Id', vlog.rows[0].id);
@@ -274,14 +273,13 @@ app.post('/api/view-log', auth, async (req, res) => {
 app.get('/api/user-doc-time', adminOnly, async (req, res) => {
   try {
     const r = await pool.query(`
-      SELECT username, file_name, file_path,
-             COUNT(*) as view_count,
-             COALESCE(SUM(CASE WHEN view_duration_seconds > 0 THEN view_duration_seconds ELSE 0 END),0) as total_seconds,
-             MAX(view_start) as last_viewed
+      SELECT id, username, file_name, file_path,
+             COALESCE(view_duration_seconds, 0) as duration_seconds,
+             view_start, view_end
       FROM view_logs
-      GROUP BY username, file_name, file_path
-      HAVING SUM(CASE WHEN view_duration_seconds > 0 THEN view_duration_seconds ELSE 0 END) > 0
-      ORDER BY username, total_seconds DESC
+      WHERE view_duration_seconds > 0
+      ORDER BY view_start DESC
+      LIMIT 500
     `);
     res.json(r.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -371,7 +369,7 @@ app.post('/api/admin/cleanup-logs', adminOnly, async (req, res) => {
     }
     deleted.total = total;
     const parts = selected.map(t => `${labels[t]}:${deleted[labels[t]]}`).join(', ');
-    logAudit(req.session.user.username, 'LOGS_CLEANUP', `Deleted ${total} records ${m===0?'(all data)':'older than '+m+'mo'} (${parts})`, getDevice(req));
+    logAudit(req.session.user.username, 'LOGS_CLEANUP', `Deleted ${total} records ${m===0?'(all data)':'older than '+m+'mo'} (${parts})`, getIP(req));
     res.json({ ok: true, deleted });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -390,7 +388,7 @@ app.post('/api/upload', adminOnly, async (req, res) => {
       body: JSON.stringify(body)
     });
     if (!r.ok) throw new Error(await r.text());
-    logAudit(req.session.user.username, 'FILE_UPLOADED', `Uploaded: ${fullPath}`, getDevice(req));
+    logAudit(req.session.user.username, 'FILE_UPLOADED', `Uploaded: ${fullPath}`, getIP(req));
     await pool.query('INSERT INTO notifications (title, message, type, target_role, created_by) VALUES ($1,$2,$3,$4,$5)',
       [`New document uploaded`, `"${fileName}" added to ${folderPath || 'root'}`, 'upload', 'user', req.session.user.username]);
     res.json({ ok: true, path: fullPath });
@@ -405,7 +403,7 @@ app.post('/api/create-folder', adminOnly, async (req, res) => {
       body: JSON.stringify({ message: `Create ${folderPath}`, content: '', branch: GITHUB_BRANCH })
     });
     if (!r.ok) throw new Error(await r.text());
-    logAudit(req.session.user.username, 'FOLDER_CREATED', `Created: ${folderPath}`, getDevice(req));
+    logAudit(req.session.user.username, 'FOLDER_CREATED', `Created: ${folderPath}`, getIP(req));
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -419,7 +417,7 @@ app.delete('/api/files/*', adminOnly, async (req, res) => {
       body: JSON.stringify({ message: `Delete ${fp}`, sha: existing.sha, branch: GITHUB_BRANCH })
     });
     if (!r.ok) throw new Error(await r.text());
-    logAudit(req.session.user.username, 'FILE_DELETED', `Deleted: ${fp}`, getDevice(req));
+    logAudit(req.session.user.username, 'FILE_DELETED', `Deleted: ${fp}`, getIP(req));
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
