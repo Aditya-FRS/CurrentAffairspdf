@@ -43,6 +43,7 @@ async function initDB() {
 
 // ==================== MIDDLEWARE ====================
 app.use(express.json({ limit: '50mb' }));
+app.use(express.text({ type: 'text/plain' }));
 app.use(session({ secret: process.env.SESSION_SECRET || 'dv-secret-change-me', resave: false, saveUninitialized: false, cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 } }));
 app.use((req, res, next) => {
   if (req.session.user) {
@@ -64,16 +65,26 @@ const getIP = r => {
   if (ip === '::1' || ip === '127.0.0.1') ip = 'Localhost';
   return ip;
 };
-const logAudit = (u, a, d, ip) => pool.query('INSERT INTO audit_log (username, action, details, ip_address) VALUES ($1,$2,$3,$4)', [u, a, d, ip || '']).catch(() => {});
+const getDevice = r => parseBrowser(r.headers['user-agent'] || '');
+const logAudit = (u, a, d, device) => pool.query('INSERT INTO audit_log (username, action, details, ip_address) VALUES ($1,$2,$3,$4)', [u, a, d, device || '']).catch(() => {});
 
 function parseBrowser(ua) {
   if (!ua) return 'Web Browser';
-  if (ua.includes('Edg/')) return 'Microsoft Edge';
-  if (ua.includes('Chrome/') && !ua.includes('Edg/')) return 'Google Chrome';
-  if (ua.includes('Firefox/')) return 'Mozilla Firefox';
-  if (ua.includes('Safari/') && !ua.includes('Chrome/')) return 'Safari';
-  if (ua.includes('Opera/') || ua.includes('OPR/')) return 'Opera';
-  return 'Web Browser';
+  let browser = 'Web Browser';
+  if (ua.includes('Edg/')) browser = 'Edge';
+  else if (ua.includes('OPR/') || ua.includes('Opera/')) browser = 'Opera';
+  else if (ua.includes('Chrome/')) browser = 'Chrome';
+  else if (ua.includes('Firefox/')) browser = 'Firefox';
+  else if (ua.includes('Safari/')) browser = 'Safari';
+  let os = '';
+  if (ua.includes('iPhone')) os = 'iPhone';
+  else if (ua.includes('iPad')) os = 'iPad';
+  else if (ua.includes('Android')) { os = 'Android'; const m = ua.match(/;\s*([^;)]+)\s*Build/); if (m) os = m[1].trim(); }
+  else if (ua.includes('Windows NT 10')) os = 'Windows';
+  else if (ua.includes('Windows NT')) os = 'Windows';
+  else if (ua.includes('Mac OS X')) os = 'Mac';
+  else if (ua.includes('Linux')) os = 'Linux';
+  return os ? `${browser} · ${os}` : browser;
 }
 
 // ==================== GITHUB HELPER ====================
@@ -100,21 +111,22 @@ app.post('/api/login', async (req, res) => {
     const r = await pool.query('SELECT * FROM doc_users WHERE username = $1', [username]);
     const user = r.rows[0];
     if (!user || !bcrypt.compareSync(password, user.password)) {
-      logAudit(username || 'unknown', 'LOGIN_FAILED', 'Invalid credentials', getIP(req));
+      logAudit(username || 'unknown', 'LOGIN_FAILED', 'Invalid credentials', getDevice(req));
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     const browser = browserInfo || parseBrowser(req.headers['user-agent'] || '');
     req.session.user = { id: user.id, username: user.username, role: user.role, avatarColor: user.avatar_color };
     req.session.lastActivity = Date.now();
-    const log = await pool.query('INSERT INTO login_logs (username, ip_address, browser_info) VALUES ($1, $2, $3) RETURNING id', [user.username, getIP(req), browser]);
+    const log = await pool.query('INSERT INTO login_logs (username, ip_address, browser_info) VALUES ($1, $2, $3) RETURNING id', [user.username, getDevice(req), browser]);
     req.session.loginLogId = log.rows[0].id;
-    logAudit(user.username, 'LOGIN', `Via ${browser}`, getIP(req));
+    logAudit(user.username, 'LOGIN', `Via ${browser}`, getDevice(req));
     res.json({ username: user.username, role: user.role, avatarColor: user.avatar_color });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/logout', auth, async (req, res) => {
-  logAudit(req.session.user.username, 'LOGOUT', 'Logged out', getIP(req));
+app.post('/api/logout', async (req, res) => {
+  if (!req.session.user) return res.json({ ok: true });
+  logAudit(req.session.user.username, 'LOGOUT', 'Logged out', getDevice(req));
   if (req.session.loginLogId) await pool.query('UPDATE login_logs SET logout_time = NOW() WHERE id = $1', [req.session.loginLogId]).catch(() => {});
   req.session.destroy();
   res.json({ ok: true });
@@ -147,14 +159,14 @@ app.post('/api/users', adminOnly, async (req, res) => {
     const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
     await pool.query('INSERT INTO doc_users (username, password, role, avatar_color) VALUES ($1,$2,$3,$4)',
       [username, bcrypt.hashSync(password, 10), role || 'user', colors[Math.floor(Math.random() * colors.length)]]);
-    logAudit(req.session.user.username, 'USER_CREATED', `Created: ${username}`, getIP(req));
+    logAudit(req.session.user.username, 'USER_CREATED', `Created: ${username}`, getDevice(req));
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.delete('/api/users/:id', adminOnly, async (req, res) => {
   const r = await pool.query('SELECT username FROM doc_users WHERE id = $1', [req.params.id]);
   await pool.query('DELETE FROM doc_users WHERE id = $1 AND role != $2', [req.params.id, 'admin']);
-  if (r.rows[0]) logAudit(req.session.user.username, 'USER_DELETED', `Deleted: ${r.rows[0].username}`, getIP(req));
+  if (r.rows[0]) logAudit(req.session.user.username, 'USER_DELETED', `Deleted: ${r.rows[0].username}`, getDevice(req));
   res.json({ ok: true });
 });
 app.post('/api/users/change-password', auth, async (req, res) => {
@@ -162,7 +174,7 @@ app.post('/api/users/change-password', auth, async (req, res) => {
   if (!newPassword || newPassword.length < 4) return res.status(400).json({ error: 'Min 4 chars' });
   const targetId = req.session.user.role === 'admin' && userId ? userId : req.session.user.id;
   await pool.query('UPDATE doc_users SET password = $1 WHERE id = $2', [bcrypt.hashSync(newPassword, 10), targetId]);
-  logAudit(req.session.user.username, 'PASSWORD_CHANGED', `User ID: ${targetId}`, getIP(req));
+  logAudit(req.session.user.username, 'PASSWORD_CHANGED', `User ID: ${targetId}`, getDevice(req));
   res.json({ ok: true });
 });
 
@@ -237,7 +249,7 @@ app.get('/api/pdf/*', auth, async (req, res) => {
     const buffer = await response.arrayBuffer();
     const fileName = filePath.split('/').pop();
     const vlog = await pool.query('INSERT INTO view_logs (username, file_path, file_name) VALUES ($1,$2,$3) RETURNING id', [req.session.user.username, filePath, fileName]);
-    logAudit(req.session.user.username, 'VIEW_FILE', `Viewed: ${filePath}`, getIP(req));
+    logAudit(req.session.user.username, 'VIEW_FILE', `Viewed: ${filePath}`, getDevice(req));
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline');
     res.setHeader('X-View-Log-Id', vlog.rows[0].id);
@@ -247,7 +259,8 @@ app.get('/api/pdf/*', auth, async (req, res) => {
 
 // Accurate view duration: client sends viewLogId + seconds on close
 app.post('/api/view-log', auth, async (req, res) => {
-  const { viewLogId, filePath, durationSeconds } = req.body;
+  const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  const { viewLogId, filePath, durationSeconds } = body;
   const secs = Math.max(0, Math.min(durationSeconds || 0, 86400)); // cap at 24h
   if (viewLogId) {
     await pool.query(`UPDATE view_logs SET view_duration_seconds = $1, view_end = NOW() WHERE id = $2 AND username = $3`, [secs, viewLogId, req.session.user.username]);
@@ -263,10 +276,11 @@ app.get('/api/user-doc-time', adminOnly, async (req, res) => {
     const r = await pool.query(`
       SELECT username, file_name, file_path,
              COUNT(*) as view_count,
-             COALESCE(SUM(view_duration_seconds),0) as total_seconds,
+             COALESCE(SUM(CASE WHEN view_duration_seconds > 0 THEN view_duration_seconds ELSE 0 END),0) as total_seconds,
              MAX(view_start) as last_viewed
       FROM view_logs
       GROUP BY username, file_name, file_path
+      HAVING SUM(CASE WHEN view_duration_seconds > 0 THEN view_duration_seconds ELSE 0 END) > 0
       ORDER BY username, total_seconds DESC
     `);
     res.json(r.rows);
@@ -357,7 +371,7 @@ app.post('/api/admin/cleanup-logs', adminOnly, async (req, res) => {
     }
     deleted.total = total;
     const parts = selected.map(t => `${labels[t]}:${deleted[labels[t]]}`).join(', ');
-    logAudit(req.session.user.username, 'LOGS_CLEANUP', `Deleted ${total} records ${m===0?'(all data)':'older than '+m+'mo'} (${parts})`, getIP(req));
+    logAudit(req.session.user.username, 'LOGS_CLEANUP', `Deleted ${total} records ${m===0?'(all data)':'older than '+m+'mo'} (${parts})`, getDevice(req));
     res.json({ ok: true, deleted });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -376,7 +390,7 @@ app.post('/api/upload', adminOnly, async (req, res) => {
       body: JSON.stringify(body)
     });
     if (!r.ok) throw new Error(await r.text());
-    logAudit(req.session.user.username, 'FILE_UPLOADED', `Uploaded: ${fullPath}`, getIP(req));
+    logAudit(req.session.user.username, 'FILE_UPLOADED', `Uploaded: ${fullPath}`, getDevice(req));
     await pool.query('INSERT INTO notifications (title, message, type, target_role, created_by) VALUES ($1,$2,$3,$4,$5)',
       [`New document uploaded`, `"${fileName}" added to ${folderPath || 'root'}`, 'upload', 'user', req.session.user.username]);
     res.json({ ok: true, path: fullPath });
@@ -391,7 +405,7 @@ app.post('/api/create-folder', adminOnly, async (req, res) => {
       body: JSON.stringify({ message: `Create ${folderPath}`, content: '', branch: GITHUB_BRANCH })
     });
     if (!r.ok) throw new Error(await r.text());
-    logAudit(req.session.user.username, 'FOLDER_CREATED', `Created: ${folderPath}`, getIP(req));
+    logAudit(req.session.user.username, 'FOLDER_CREATED', `Created: ${folderPath}`, getDevice(req));
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -405,7 +419,7 @@ app.delete('/api/files/*', adminOnly, async (req, res) => {
       body: JSON.stringify({ message: `Delete ${fp}`, sha: existing.sha, branch: GITHUB_BRANCH })
     });
     if (!r.ok) throw new Error(await r.text());
-    logAudit(req.session.user.username, 'FILE_DELETED', `Deleted: ${fp}`, getIP(req));
+    logAudit(req.session.user.username, 'FILE_DELETED', `Deleted: ${fp}`, getDevice(req));
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

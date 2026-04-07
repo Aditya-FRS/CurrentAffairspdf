@@ -169,8 +169,12 @@ select.ts{padding:5px 9px;border:1px solid var(--border);border-radius:6px;font-
 .pba{display:flex;gap:4px;align-items:center}
 .pb2{padding:4px 10px;border:1px solid #30335a;border-radius:6px;background:#1c1f38;color:#bbc;font-size:11px;cursor:pointer;font-family:var(--font);transition:all .1s;display:inline-flex;align-items:center;gap:3px}.pb2:hover{background:#26294a;border-color:#44477a}.pb2.am{background:var(--primary);color:#fff;border-color:var(--primary)}.pb2 .mi{font-size:15px}
 .pbar .pif{font-size:10.5px;color:#777a98;min-width:44px;text-align:center}
-.pbody{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;padding:18px;background:#282b3a;gap:12px;user-select:none;-webkit-user-select:none}
+.pbody{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;padding:18px;background:#282b3a;gap:12px}
 .pbody canvas{box-shadow:0 4px 28px rgba(0,0,0,.5);border-radius:2px}
+.pgw{position:relative;display:inline-block}
+.pgw .textLayer{position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;opacity:.25;line-height:1}
+.pgw .textLayer span{color:transparent;position:absolute;white-space:pre;cursor:text}
+.pgw .textLayer ::selection{background:rgba(0,100,200,.4)}
 .wml{position:fixed;inset:0;pointer-events:none;z-index:1001;overflow:hidden}
 .wm{position:absolute;color:rgba(160,160,190,.09);font-size:20px;font-weight:700;transform:rotate(-30deg);white-space:nowrap;user-select:none}
 
@@ -266,7 +270,7 @@ tr:hover td{background:var(--bg3)}
     <div class="pg" id="pg-users"><div class="ph"><div class="pt2"><span class="mi">group</span>Users</div><button class="btn bp" onclick="showModal('userModal')"><span class="mi" style="font-size:15px">person_add</span> Add User</button></div><div class="cd"><table><thead><tr><th>User</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead><tbody id="usersTb"></tbody></table></div></div>
     <div class="pg" id="pg-sessions"><div class="ph"><div class="pt2"><span class="mi">devices</span>Login Sessions</div><button class="btn bg bs" onclick="exportCSV('logins')"><span class="mi" style="font-size:14px">download</span> Export</button></div><div class="cd"><div class="sgr" id="sessionGrid"></div></div></div>
     <div class="pg" id="pg-doctime"><div class="ph"><div class="pt2"><span class="mi">timer</span>User Document Time</div></div><div class="cd"><div class="udt"><table><thead><tr><th>User</th><th>Document</th><th>Views</th><th>Total Time</th><th>Last Viewed</th></tr></thead><tbody id="doctimeTb"></tbody></table></div></div></div>
-    <div class="pg" id="pg-audit"><div class="ph"><div class="pt2"><span class="mi">shield</span>Audit Trail</div><button class="btn bg bs" onclick="exportCSV('audit')"><span class="mi" style="font-size:14px">download</span> Export</button></div><div class="cd"><div style="max-height:450px;overflow-y:auto"><table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr></thead><tbody id="auditTb"></tbody></table></div><div class="pag" id="auditPag"></div></div></div>
+    <div class="pg" id="pg-audit"><div class="ph"><div class="pt2"><span class="mi">shield</span>Audit Trail</div><button class="btn bg bs" onclick="exportCSV('audit')"><span class="mi" style="font-size:14px">download</span> Export</button></div><div class="cd"><div style="max-height:450px;overflow-y:auto"><table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th><th>Device</th></tr></thead><tbody id="auditTb"></tbody></table></div><div class="pag" id="auditPag"></div></div></div>
     <div class="pg" id="pg-analytics"><div class="ph"><div class="pt2"><span class="mi">bar_chart</span>Analytics</div><div style="display:flex;gap:5px;align-items:center"><select class="ts" id="aDays" onchange="loadAnalytics()"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select><button class="btn bg bs" onclick="exportCSV('logins')">Logins CSV</button><button class="btn bg bs" onclick="exportCSV('views')">Views CSV</button></div></div><div class="sg" id="aStats"></div><div class="chg"><div class="chc"><h4>Logins Per Day</h4><canvas id="c1"></canvas></div><div class="chc"><h4>Logins By User</h4><canvas id="c2"></canvas></div><div class="chc"><h4>Time Spent (min)</h4><canvas id="c3"></canvas></div><div class="chc"><h4>Views Per Day</h4><canvas id="c4"></canvas></div><div class="chc"><h4>Views By User</h4><canvas id="c5"></canvas></div><div class="chc"><h4>Top Documents</h4><canvas id="c6"></canvas></div></div></div>
     <div class="pg" id="pg-settings"><div class="ph"><div class="pt2"><span class="mi">settings</span>Settings</div></div>
 <div class="cd"><div class="cdh"><h3><span class="mi" style="font-size:18px;vertical-align:middle;margin-right:6px">delete_sweep</span>Database Maintenance</h3></div>
@@ -305,7 +309,7 @@ tr:hover td{background:var(--bg3)}
     <button class="pb2" onclick="pFit()"><span class="mi">fit_screen</span></button><button class="pb2" id="pStar" onclick="togglePdfStar()"><span class="mi">star_border</span></button>
     <button class="pb2 admin-only" id="pDL" onclick="pDownload()"><span class="mi">download</span></button><button class="pb2" onclick="closePdf()" style="color:#f87171"><span class="mi">close</span></button>
   </div></div>
-  <div class="pbody" id="pdfBody" oncontextmenu="return false"></div>
+  <div class="pbody" id="pdfBody"></div>
   <div class="wml" id="wmLayer"></div>
 </div>
 
@@ -338,7 +342,7 @@ function toggleEye(){const p=document.getElementById('loginPass'),i=document.get
 function toggleTheme(){const d=document.documentElement.dataset.theme==='dark';document.documentElement.dataset.theme=d?'light':'dark';localStorage.setItem('dv-theme',d?'light':'dark');updTI()}
 function updTI(){document.getElementById('themeBtn').innerHTML=document.documentElement.dataset.theme==='dark'?'<span class="mi">light_mode</span>':'<span class="mi">dark_mode</span>'}
 (function(){const t=localStorage.getItem('dv-theme');if(t)document.documentElement.dataset.theme=t;updTI()})();
-function getBrowser(){const u=navigator.userAgent;if(u.includes('Edg/'))return'Microsoft Edge';if(u.includes('Chrome/')&&!u.includes('Edg/'))return'Google Chrome';if(u.includes('Firefox/'))return'Mozilla Firefox';if(u.includes('Safari/')&&!u.includes('Chrome/'))return'Safari';return'Web Browser'}
+function getBrowser(){const u=navigator.userAgent;let b='Web Browser';if(u.includes('Edg/'))b='Edge';else if(u.includes('OPR/')||u.includes('Opera/'))b='Opera';else if(u.includes('Chrome/'))b='Chrome';else if(u.includes('Firefox/'))b='Firefox';else if(u.includes('Safari/'))b='Safari';let os='';if(/iPhone/.test(u))os='iPhone';else if(/iPad/.test(u))os='iPad';else if(/Android/.test(u)){os='Android';const m=u.match(/;\s*([^;)]+)\s*Build/);if(m)os=m[1].trim()}else if(/Windows/.test(u))os='Windows';else if(/Mac OS/.test(u))os='Mac';else if(/Linux/.test(u))os='Linux';return os?b+' · '+os:b}
 
 async function doLogin(){const u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value,err=document.getElementById('loginError');err.style.display='none';if(!u||!p){err.textContent='Enter username and password';err.style.display='block';return}try{U=await api('/api/login',{method:'POST',body:JSON.stringify({username:u,password:p,browserInfo:getBrowser()})});boot()}catch(e){err.textContent=e.message;err.style.display='block'}}
 async function doLogout(){try{await api('/api/logout',{method:'POST'})}catch(e){}U=null;document.getElementById('app').style.display='none';document.getElementById('loginPage').style.display='flex';document.getElementById('loginPass').value=''}
@@ -389,20 +393,31 @@ async function openPdf(fp,fn){if(!/\.pdf$/i.test(fn))return;document.getElementB
 document.getElementById('mPage').classList.add('am');document.getElementById('mScroll').classList.remove('am');document.getElementById('pStar').innerHTML=favs.has(fp)?'<span class="mi">star</span>':'<span class="mi">star_border</span>';mkWM();
 try{const resp=await apiRaw(`/api/pdf/${fp}`);if(!resp.ok)throw new Error('Failed to load');pViewLogId=resp.headers.get('X-View-Log-Id');const buf=await resp.arrayBuffer();pDoc=await pdfjsLib.getDocument({data:buf}).promise;document.getElementById('pInfo').textContent=`1/${pDoc.numPages}`;renderPdf()}catch(e){toast(e.message,'error');closePdf()}}
 function mkWM(){const l=document.getElementById('wmLayer');l.innerHTML='';if(U.role==='admin')return;for(let i=0;i<15;i++){const w=document.createElement('div');w.className='wm';w.textContent=U.username+' - CONFIDENTIAL';w.style.top=(i*100+20)+'px';w.style.left=((i%3)*300-100)+'px';l.appendChild(w)}}
-async function renderPdf(){if(!pDoc)return;const body=document.getElementById('pdfBody');body.querySelectorAll('canvas').forEach(c=>c.remove());
-if(pMode==='scroll'){for(let i=1;i<=pDoc.numPages;i++){const pg=await pDoc.getPage(i),vp=pg.getViewport({scale:pSc}),c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;body.appendChild(c);await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise}document.getElementById('pInfo').textContent=`All ${pDoc.numPages}`}
-else{const pg=await pDoc.getPage(pPg),vp=pg.getViewport({scale:pSc}),c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;body.appendChild(c);await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;document.getElementById('pInfo').textContent=`${pPg}/${pDoc.numPages}`}
+async function renderPdf(){if(!pDoc)return Promise.resolve();const body=document.getElementById('pdfBody');body.querySelectorAll('.pgw').forEach(c=>c.remove());body.querySelectorAll('canvas').forEach(c=>c.remove());
+async function renderPage(i){const pg=await pDoc.getPage(i),vp=pg.getViewport({scale:pSc}),wrap=document.createElement('div');wrap.className='pgw';wrap.style.width=vp.width+'px';wrap.style.height=vp.height+'px';const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;wrap.appendChild(c);await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;const txt=await pg.getTextContent();const tDiv=document.createElement('div');tDiv.className='textLayer';tDiv.style.width=vp.width+'px';tDiv.style.height=vp.height+'px';pdfjsLib.renderTextLayer({textContent:txt,container:tDiv,viewport:vp,textDivs:[]});wrap.appendChild(tDiv);body.appendChild(wrap)}
+if(pMode==='scroll'){for(let i=1;i<=pDoc.numPages;i++)await renderPage(i);document.getElementById('pInfo').textContent=`All ${pDoc.numPages}`}
+else{await renderPage(pPg);document.getElementById('pInfo').textContent=`${pPg}/${pDoc.numPages}`}
 document.getElementById('pZoom').textContent=Math.round(pSc*100)+'%'}
 function setPdfMode(m){pMode=m;document.getElementById('mPage').classList.toggle('am',m==='page');document.getElementById('mScroll').classList.toggle('am',m==='scroll');renderPdf()}
 function pPrev(){if(pMode==='page'&&pPg>1){pPg--;renderPdf()}}
 function pNext(){if(pMode==='page'&&pDoc&&pPg<pDoc.numPages){pPg++;renderPdf()}}
-function pIn(){pSc=Math.min(pSc+.2,4);renderPdf()}
-function pOut(){pSc=Math.max(pSc-.2,.3);renderPdf()}
-function pFit(){const w=document.getElementById('pdfBody').clientWidth-50;if(pDoc)pDoc.getPage(pPg||1).then(p=>{pSc=w/p.getViewport({scale:1}).width;renderPdf()})}
+function pIn(){const body=document.getElementById('pdfBody'),pct=body.scrollHeight?body.scrollTop/body.scrollHeight:0;pSc=Math.min(pSc+.2,4);renderPdf().then(()=>{if(pMode==='scroll')body.scrollTop=pct*body.scrollHeight})}
+function pOut(){const body=document.getElementById('pdfBody'),pct=body.scrollHeight?body.scrollTop/body.scrollHeight:0;pSc=Math.max(pSc-.2,.3);renderPdf().then(()=>{if(pMode==='scroll')body.scrollTop=pct*body.scrollHeight})}
+function pFit(){const body=document.getElementById('pdfBody'),w=body.clientWidth-50,pct=body.scrollHeight?body.scrollTop/body.scrollHeight:0;if(pDoc)pDoc.getPage(pPg||1).then(p=>{pSc=w/p.getViewport({scale:1}).width;renderPdf().then(()=>{if(pMode==='scroll')body.scrollTop=pct*body.scrollHeight})})}
 function pDownload(){if(U.role==='admin')window.open(`/api/pdf/${pFile}`,'_blank')}
 function togglePdfStar(){toggleFav(pFile,pName);document.getElementById('pStar').innerHTML=favs.has(pFile)?'<span class="mi">star_border</span>':'<span class="mi">star</span>'}
 function closePdf(){document.getElementById('pdfOvl').classList.remove('open');document.getElementById('wmLayer').innerHTML='';if(pStart&&pFile){const secs=Math.round((Date.now()-pStart)/1000);api('/api/view-log',{method:'POST',body:JSON.stringify({viewLogId:pViewLogId,filePath:pFile,durationSeconds:secs})}).catch(()=>{})}pDoc=null;pFile='';pStart=null;pViewLogId=null}
 document.addEventListener('keydown',e=>{if(!document.getElementById('pdfOvl').classList.contains('open'))return;if(e.key==='Escape')closePdf();if(e.key==='ArrowLeft')pPrev();if(e.key==='ArrowRight')pNext();if(e.ctrlKey&&e.key==='p'){e.preventDefault();toast('Printing disabled','error')}});
+
+// Save view time + logout on tab close/navigate away
+window.addEventListener('beforeunload',()=>{
+  if(pStart&&pFile){const secs=Math.round((Date.now()-pStart)/1000);navigator.sendBeacon('/api/view-log',JSON.stringify({viewLogId:pViewLogId,filePath:pFile,durationSeconds:secs}))}
+  if(U)navigator.sendBeacon('/api/logout','{}');
+});
+// Save view time when tab goes hidden (user switches tab/minimizes)
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden&&pStart&&pFile){const secs=Math.round((Date.now()-pStart)/1000);navigator.sendBeacon('/api/view-log',JSON.stringify({viewLogId:pViewLogId,filePath:pFile,durationSeconds:secs}))}
+});
 
 async function loadUpFolders(){try{const f=await api('/api/folders');const s=document.getElementById('upFolder');s.innerHTML='<option value="">/ (root)</option>';f.filter(x=>x.type==='dir').forEach(x=>{s.appendChild(Object.assign(document.createElement('option'),{value:x.name,textContent:x.name}))})}catch(e){}}
 const dz=document.getElementById('dropZone');dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over')});dz.addEventListener('dragleave',()=>dz.classList.remove('over'));dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');uploadFiles(e.dataTransfer.files)});
@@ -422,8 +437,8 @@ function showMyPwModal(){document.getElementById('cpId').value='';document.getEl
 function changePw(){const id=document.getElementById('cpId').value,pw=document.getElementById('cpPw').value;if(!pw||pw.length<4)return toast('Min 4 chars','error');api('/api/users/change-password',{method:'POST',body:JSON.stringify({userId:id||undefined,newPassword:pw})}).then(()=>{toast('Changed','success');closeModal('pwModal')}).catch(e=>toast(e.message,'error'))}
 
 async function loadSessions(){try{const sessions=await api('/api/active-sessions');const colors=['#5046e5','#8b5cf6','#ec4899','#f43f5e','#f97316','#22c55e','#06b6d4','#3b82f6'];
-document.getElementById('sessionGrid').innerHTML=sessions.map(s=>{const on=!s.logout_time;const cl=colors[s.username.charCodeAt(0)%colors.length];const ip=s.ip_address||'';const fip=(!ip||ip==='::1'||ip==='127.0.0.1'||ip.includes('::ffff:127'))?'Localhost':ip.replace('::ffff:','');
-return`<div class="sr"><div class="sav" style="background:${cl}">${s.username[0].toUpperCase()}</div><div class="sin"><div class="snn">${s.username}</div><div class="sbr"><span class="mi">computer</span>${s.browser_info} &middot; ${fip}</div></div><div class="sti"><div class="sd2">${fmtDate(s.login_time)}</div><div class="sa2">${fmtAgo(s.login_time)}</div></div><div class="sts ${on?'on':'off'}">${on?'Active':'Ended'}</div></div>`}).join('')||'<div class="empty"><p>No sessions</p></div>'}catch(e){toast(e.message,'error')}}
+document.getElementById('sessionGrid').innerHTML=sessions.map(s=>{const on=!s.logout_time;const cl=colors[s.username.charCodeAt(0)%colors.length];
+return`<div class="sr"><div class="sav" style="background:${cl}">${s.username[0].toUpperCase()}</div><div class="sin"><div class="snn">${s.username}</div><div class="sbr"><span class="mi">computer</span>${s.browser_info}</div></div><div class="sti"><div class="sd2">${fmtDate(s.login_time)}</div><div class="sa2">${fmtAgo(s.login_time)}</div></div><div class="sts ${on?'on':'off'}">${on?'Active':'Ended'}</div></div>`}).join('')||'<div class="empty"><p>No sessions</p></div>'}catch(e){toast(e.message,'error')}}
 
 async function loadDocTime(){try{const rows=await api('/api/user-doc-time');document.getElementById('doctimeTb').innerHTML=rows.map(r=>`<tr><td><strong style="font-size:11.5px">${r.username}</strong></td><td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${r.file_name||r.file_path}</td><td style="font-size:11px">${r.view_count}</td><td style="font-size:11px;font-weight:600">${fmtDur(+r.total_seconds)}</td><td style="font-size:10.5px;color:var(--text3)">${fmtDate(r.last_viewed)}</td></tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--text3)">No data</td></tr>'}catch(e){toast(e.message,'error')}}
 
@@ -453,7 +468,7 @@ async function readAllNotifs(){await api('/api/notifications/read-all',{method:'
 function toggleUserMenu(){document.getElementById('userPanel').classList.toggle('open')}
 document.addEventListener('click',e=>{if(!e.target.closest('.ib')&&!e.target.closest('.np'))document.getElementById('notifPanel').classList.remove('open');if(!e.target.closest('.avt')&&!e.target.closest('.up2'))document.getElementById('userPanel').classList.remove('open')});
 
-async function loadAudit(){try{const d=await api(`/api/audit-log?page=${aPage}&limit=50`);document.getElementById('auditTb').innerHTML=d.logs.map(l=>`<tr><td style="white-space:nowrap;color:var(--text3);font-size:10.5px">${fmtDate(l.created_at)}</td><td><strong style="font-size:11.5px">${l.username}</strong></td><td><span class="at2 at2-${l.action}">${l.action.replace(/_/g,' ')}</span></td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;color:var(--text2);font-size:10.5px">${l.details||'-'}</td><td style="font-size:10.5px;color:var(--text3)">${l.ip_address||'-'}</td></tr>`).join('');
+async function loadAudit(){try{const d=await api(`/api/audit-log?page=${aPage}&limit=50`);document.getElementById('auditTb').innerHTML=d.logs.map(l=>`<tr><td style="white-space:nowrap;color:var(--text3);font-size:10.5px">${fmtDate(l.created_at)}</td><td><strong style="font-size:11.5px">${l.username}</strong></td><td><span class="at2 at2-${l.action}">${l.action.replace(/_/g,' ')}</span></td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;color:var(--text2);font-size:10.5px">${l.details||'-'}</td><td style="font-size:10.5px;color:var(--text3)"><span class="mi" style="font-size:13px;vertical-align:middle">computer</span> ${l.ip_address||'-'}</td></tr>`).join('');
 const tp=Math.ceil(d.total/50),pg=document.getElementById('auditPag');pg.innerHTML='';for(let i=1;i<=Math.min(tp,10);i++){const b=document.createElement('button');b.className='btn bg bs'+(i===aPage?' cur':'');b.textContent=i;b.onclick=()=>{aPage=i;loadAudit()};pg.appendChild(b)}}catch(e){toast(e.message,'error')}}
 function exportCSV(t){window.open(`/api/analytics/export?type=${t}&days=${document.getElementById('aDays')?.value||30}`)}
 
